@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-background: #0B1020;
+  --color-surface: #161B33;
+  --color-primary-gradient: #FF4D6D;
+  --color-primary-gradient-end: #D03E58;
+  --color-accent: #00E5FF;
+  --color-text-main: #FFFFFF;
+  --color-sponsored: #FFD700;
+  
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+
+  --radius-card: 12px;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-text-main font-sans selection:bg-accent selection:text-background;
+  }
+}
+
+.gradient-button {
+  @apply bg-gradient-to-br from-[#FF4D6D] to-[#D03E58] text-white font-bold py-4 px-6 rounded-lg hover:opacity-90 transition-opacity active:scale-[0.98];
+}
+
+.card-surface {
+  @apply bg-surface rounded-[var(--radius-card)] border border-white/5;
+}
+
+.glowing-accent {
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+}
+
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FF4D6D] to-[#FF8FA3];
+}
+
+.nav-pill {
+  @apply flex items-center gap-3 bg-surface px-4 py-2 rounded-full border border-white/5;
+}
+
+.stat-item {
+  @apply bg-background p-3 rounded-lg text-center border border-white/5;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-surface rounded-full;
+}
