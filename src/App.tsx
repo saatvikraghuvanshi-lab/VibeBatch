@@ -303,8 +303,8 @@ export default function App() {
         {isLoginView ? (
           <form className="space-y-4" onSubmit={onLogin}>
             <div className="space-y-4">
-              <input type="email" placeholder="Email" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
-              <input type="password" placeholder="Password" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
+              <input name="email" type="email" placeholder="Email" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
+              <input name="password" type="password" placeholder="Password" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
             </div>
             <div className="text-right">
               <button type="button" className="text-accent text-sm font-medium hover:underline">Forgot password?</button>
@@ -332,6 +332,7 @@ export default function App() {
             </div>
             <div className="space-y-4">
               <input name="displayName" type="text" placeholder="Display Name" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
+              <input name="username" type="text" placeholder="Username" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
               <input name="email" type="email" placeholder="Email" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
               <input name="password" type="password" placeholder="Password" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
               <input name="contact" type="tel" placeholder="Contact Number" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" />
@@ -616,13 +617,7 @@ export default function App() {
           transition={{ duration: 0.2 }}
         >
           {currentScreen === 'home' && authState.user && (
-            <HomeScreen 
-              user={authState.user} 
-              onOpenProfile={() => setIsProfileSheetOpen(true)}
-              onSearch={fetchUserProfile}
-              onNavigate={setCurrentScreen}
-              loading={loading}
-            />
+            <HomeScreen />
           )}
 
           {currentScreen === 'friends' && authState.user && (
