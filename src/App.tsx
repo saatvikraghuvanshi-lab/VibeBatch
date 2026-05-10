@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Users, 
@@ -30,9 +30,10 @@ import {
   Download,
   Trash2,
   CheckCircle2,
-  Clock
+  Clock,
+  Send,
 } from 'lucide-react';
-import { UserProfile, AuthState, Trait, Friend } from '../lib/types';
+import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
 import { getStore, saveStore, createMockUser } from '../lib/store';
 import { generateIdentityTitle } from '../lib/gemini';
 
@@ -119,6 +120,88 @@ export default function App() {
       setLoading(false);
       setCurrentScreen('home');
     }, 1500);
+  };
+
+  const addFriend = (name: string) => {
+    if (!authState.user) return;
+    const newFriend: Friend = {
+      id: Math.random().toString(36).substr(2, 9),
+      displayName: name,
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+      friendshipDate: new Date().toISOString(),
+      hasVoted: false,
+      messagesCount: 0,
+      status: 'online',
+      messages: []
+    };
+    setAuthState({
+      ...authState,
+      user: {
+        ...authState.user,
+        friends: [newFriend, ...authState.user.friends]
+      }
+    });
+  };
+
+  const sendMessage = (friendId: string, text: string) => {
+    if (!authState.user) return;
+    
+    const newMessage: ChatMessage = {
+      id: Date.now().toString(),
+      senderId: 'me',
+      text,
+      timestamp: new Date().toISOString(),
+      isRead: true
+    };
+    
+    const updatedFriends = authState.user.friends.map(f => {
+      if (f.id === friendId) {
+        return {
+          ...f,
+          messages: [...(f.messages || []), newMessage],
+          messagesCount: (f.messagesCount || 0) + 1
+        };
+      }
+      return f;
+    });
+    
+    setAuthState({
+      ...authState,
+      user: {
+        ...authState.user,
+        friends: updatedFriends
+      }
+    });
+
+    // Mock auto-reply
+    setTimeout(() => {
+      if (!authState.user) return;
+      const replyMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        senderId: friendId,
+        text: "That's interesting! Tell me more.",
+        timestamp: new Date().toISOString(),
+        isRead: false
+      };
+      
+      setAuthState(current => {
+        if (!current.user) return current;
+        const autoReplyFriends = current.user.friends.map(f => {
+          if (f.id === friendId) {
+            return {
+              ...f,
+              messages: [...f.messages, replyMessage],
+              messagesCount: f.messagesCount + 1
+            };
+          }
+          return f;
+        });
+        return {
+          ...current,
+          user: { ...current.user, friends: autoReplyFriends }
+        };
+      });
+    }, 2000);
   };
 
   const logout = () => {
@@ -232,10 +315,10 @@ export default function App() {
           
           <div className="flex items-center gap-4">
             <div 
-              className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-surface border-2 border-accent cursor-pointer glowing-accent overflow-hidden"
+              className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-surface border-2 border-accent cursor-pointer glowing-accent overflow-hidden flex items-center justify-center"
               onClick={() => setIsProfileSheetOpen(true)}
             >
-               <img src={user.avatar} className="w-full h-full object-cover" alt="Profile" />
+               {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="Profile" /> : <Sparkles className="text-accent/20" size={20} />}
             </div>
             
             <div className="hidden md:flex nav-pill">
@@ -254,8 +337,8 @@ export default function App() {
           {/* Left Sidebar - Profile Summary */}
           <section className="hidden lg:flex card-surface p-6 flex-col items-center overflow-y-auto">
             <div className="relative mb-6">
-              <div className="w-32 h-32 rounded-full border-4 border-accent overflow-hidden">
-                <img src={user.avatar} className="w-full h-full object-cover" alt="" />
+              <div className="w-32 h-32 rounded-full border-4 border-accent overflow-hidden flex items-center justify-center bg-surface">
+                {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="" /> : <Sparkles className="text-accent/20" size={48} />}
               </div>
               {user.identityTitle ? (
                 <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
@@ -469,12 +552,26 @@ export default function App() {
           transition={{ duration: 0.2 }}
         >
           {currentScreen === 'home' && <HomeScreen />}
-          {currentScreen === 'friends' && <FriendsScreen onBack={() => setCurrentScreen('home')} user={authState.user!} />}
+          {currentScreen === 'friends' && (
+            <FriendsScreen 
+              onBack={() => setCurrentScreen('home')} 
+              user={authState.user!} 
+              onChat={(friend: Friend) => { setSelectedFriend(friend); setCurrentScreen('chat'); }} 
+              onAddFriend={addFriend}
+            />
+          )}
           {currentScreen === 'traits' && <TraitsScreen onBack={() => setCurrentScreen('home')} user={authState.user!} />}
           {currentScreen === 'hourglass' && <HourglassScreen onBack={() => setCurrentScreen('home')} user={authState.user!} />}
           {currentScreen === 'tracker' && <VoteTrackerScreen onBack={() => setCurrentScreen('home')} user={authState.user!} />}
           {currentScreen === 'public-profile' && <PublicProfileScreen user={authState.user!} onBack={() => setCurrentScreen('home')} />}
           {currentScreen === 'storycard' && <StoryCardGeneratorScreen user={authState.user!} onBack={() => setCurrentScreen('home')} />}
+          {currentScreen === 'chat' && (
+            <ChatDetailScreen 
+              friend={authState.user!.friends.find(f => f.id === selectedFriend?.id)!} 
+              onBack={() => setCurrentScreen('friends')} 
+              onSendMessage={(text: string) => sendMessage(selectedFriend!.id, text)}
+            />
+          )}
           {currentScreen === 'voting' && <VotingScreen friend={selectedFriend!} onBack={() => setCurrentScreen('home')} onVote={(traits: string[]) => {
              // Mock vote update
              if (authState.user) {
@@ -507,7 +604,16 @@ export default function App() {
 
 // --- Screen Sub-components ---
 
-function FriendsScreen({ onBack, user }: any) {
+function FriendsScreen({ onBack, user, onChat, onAddFriend }: any) {
+  const [newName, setNewName] = useState('');
+
+  const submit = (e: any) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    onAddFriend(newName);
+    setNewName('');
+  };
+
   return (
     <div className="min-h-screen p-4 pb-24">
       <div className="flex items-center gap-4 mb-6">
@@ -515,27 +621,59 @@ function FriendsScreen({ onBack, user }: any) {
         <h2 className="text-xl font-bold font-display">Friends</h2>
       </div>
       
-      <div className="flex gap-2 mb-6">
+      <form onSubmit={submit} className="flex gap-2 mb-6">
         <div className="flex-1 bg-surface rounded-xl px-4 py-3 flex items-center gap-3">
           <Users className="text-white/20" size={18} />
-          <input type="text" placeholder="Search friends..." className="bg-transparent border-none outline-none w-full text-sm" />
+          <input 
+            type="text" 
+            placeholder="Invite by name..." 
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="bg-transparent border-none outline-none w-full text-sm" 
+          />
         </div>
-        <button className="bg-accent/10 border border-accent/20 p-3 rounded-xl text-accent"><UserPlus size={20} /></button>
-      </div>
+        <button type="submit" className="bg-accent/10 border border-accent/20 p-3 rounded-xl text-accent hover:bg-accent hover:text-background transition-all">
+          <UserPlus size={20} />
+        </button>
+      </form>
 
       <div className="space-y-3">
-        {user.friends.map((friend: Friend) => (
+        {user.friends.length > 0 ? user.friends.map((friend: Friend) => (
           <div key={friend.id} className="flex items-center justify-between p-3 card-surface">
             <div className="flex items-center gap-3">
-              <img src={friend.avatar} className="w-12 h-12 rounded-full object-cover" alt="" />
+              <div className="relative">
+                {friend.avatar ? (
+                  <img src={friend.avatar} className="w-12 h-12 rounded-full object-cover" alt="" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-surface flex items-center justify-center text-white/20 font-black">
+                    {friend.displayName[0]}
+                  </div>
+                )}
+                <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${friend.status === 'online' ? 'bg-green-500' : 'bg-white/20'}`} />
+              </div>
               <div>
-                <p className="font-bold">{friend.displayName}</p>
-                <p className="text-[10px] text-white/40 uppercase font-bold tracking-wider">9 months friends</p>
+                <p className="font-bold flex items-center gap-2">
+                  {friend.displayName}
+                  {friend.messages.some(m => !m.isRead && m.senderId !== 'me') && <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
+                </p>
+                <p className="text-[10px] text-white/40 uppercase font-bold tracking-wider">
+                  {friend.status === 'online' ? 'Active Now' : 'Last seen 2h ago'}
+                </p>
               </div>
             </div>
-            <button className="p-2 text-white/40 hover:text-accent transition-colors"><MessageCircle size={18} /></button>
+            <button 
+              onClick={() => onChat(friend)}
+              className="p-2 text-white/40 hover:text-accent transition-colors"
+            >
+              <MessageCircle size={18} />
+            </button>
           </div>
-        ))}
+        )) : (
+          <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
+            <Users size={48} className="mb-4" />
+            <p className="text-sm font-bold uppercase tracking-widest">No friends yet</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -558,7 +696,7 @@ function TraitsScreen({ onBack, user }: any) {
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
-        {top3.map((trait, i) => (
+        {user.totalVotes > 0 ? top3.map((trait, i) => (
           <div key={trait.id} className={`card-surface p-4 flex flex-col items-center justify-center text-center relative overflow-hidden ${i === 0 ? 'border-accent/40 shadow-lg shadow-accent/5' : ''} ${trait.category === 'sponsored' ? 'border-sponsored/40 bg-sponsored/5' : ''}`}>
              <span className={`text-2xl font-bold font-display mb-1 ${trait.category === 'sponsored' ? 'text-sponsored' : i === 0 ? 'text-accent' : i === 1 ? 'text-white/60' : 'text-white/40'}`}>#{i + 1}</span>
              <span className="text-xs font-bold block mb-1">{trait.name}</span>
@@ -567,7 +705,15 @@ function TraitsScreen({ onBack, user }: any) {
                <p className="text-[7px] text-sponsored font-black uppercase mt-3 tracking-widest border-t border-sponsored/20 pt-2 w-full">Sponsored by {trait.sponsoredBy}</p>
              )}
           </div>
-        ))}
+        )) : (
+          [1,2,3].map(i => (
+             <div key={i} className="card-surface p-4 flex flex-col items-center justify-center text-center opacity-40 grayscale">
+                <span className="text-2xl font-bold font-display mb-1 text-white/20">#{i}</span>
+                <div className="w-10 h-1 bg-white/10 rounded-full mb-2" />
+                <div className="w-6 h-3 bg-white/5 rounded-full" />
+             </div>
+          ))
+        )}
       </div>
 
       <div className="space-y-6">
@@ -650,7 +796,13 @@ function HourglassScreen({ onBack, user }: any) {
             {eligible.map((f: Friend) => (
               <div key={f.id} className="flex items-center justify-between p-3 card-surface">
                 <div className="flex items-center gap-3">
-                  <img src={f.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
+                  {f.avatar ? (
+                    <img src={f.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-white/10 uppercase font-black text-[10px]">
+                      {f.displayName[0]}
+                    </div>
+                  )}
                   <span className="font-bold text-sm">{f.displayName}</span>
                 </div>
                 <Badge color={f.hasVoted ? 'green' : 'accent'}>{f.hasVoted ? 'Voted' : 'Vote traits'}</Badge>
@@ -665,7 +817,13 @@ function HourglassScreen({ onBack, user }: any) {
             {pending.map((f: Friend) => (
               <div key={f.id} className="flex items-center justify-between p-3 card-surface opacity-60">
                 <div className="flex items-center gap-3">
-                  <img src={f.avatar} className="w-10 h-10 rounded-full grayscale object-cover" alt="" />
+                  {f.avatar ? (
+                    <img src={f.avatar} className="w-10 h-10 rounded-full grayscale object-cover" alt="" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-white/10 uppercase font-black text-[10px]">
+                      {f.displayName ? f.displayName[0] : '?'}
+                    </div>
+                  )}
                   <span className="font-bold text-sm">{f.displayName}</span>
                 </div>
                 <Badge color="amber">3mo left</Badge>
@@ -703,7 +861,13 @@ function VoteTrackerScreen({ onBack, user }: any) {
            {user.friends.map((friend: Friend) => (
              <div key={friend.id} className="flex items-center justify-between p-3 card-surface">
                <div className="flex items-center gap-3">
-                 <img src={friend.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
+                 {friend.avatar ? (
+                   <img src={friend.avatar} className="w-10 h-10 rounded-full object-cover" alt="" />
+                 ) : (
+                   <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-white/10 uppercase font-black text-[10px]">
+                     {friend.displayName ? friend.displayName[0] : '?'}
+                   </div>
+                 )}
                  <span className="font-bold text-sm">{friend.displayName}</span>
                </div>
                <Badge color={friend.hasVoted ? 'green' : 'amber'}>{friend.hasVoted ? 'Voted' : 'Pending'}</Badge>
@@ -729,10 +893,7 @@ function VotingScreen({ friend, onBack, onVote }: any) {
   const [isCaptchadone, setIsCaptchaDone] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const traits = [
-    'Witty', 'Magnetic', 'Stoic', 'Empathetic', 'Ambitious', 'Grounded', 
-    'Charismatic', 'Resourceful', 'Zen', 'Fearless', 'Radiant', 'Analytical'
-  ];
+  const traits = PREDEFINED_TRAITS.map(t => t.name!);
 
   const toggleTrait = (name: string) => {
     setSelectedTraits(prev => 
@@ -763,8 +924,8 @@ function VotingScreen({ friend, onBack, onVote }: any) {
   }
 
   return (
-    <div className="min-h-screen p-4 pb-12">
-      <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen flex flex-col h-screen overflow-hidden p-4">
+      <div className="flex items-center justify-between mb-8 shrink-0">
         <button onClick={onBack}><ChevronLeft /></button>
         <div className="text-center">
             <h2 className="text-lg font-bold font-display">Voting for {friend.displayName}</h2>
@@ -773,19 +934,21 @@ function VotingScreen({ friend, onBack, onVote }: any) {
         <div className="w-6"></div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-8">
-        {traits.map(trait => (
-           <button 
-             key={trait}
-             onClick={() => toggleTrait(trait)}
-             className={`p-4 card-surface font-bold text-sm transition-all text-center ${selectedTraits.includes(trait) ? 'bg-accent/20 border-accent text-accent glowing-accent' : 'hover:border-white/20'}`}
-           >
-             {trait}
-           </button>
-        ))}
+      <div className="flex-1 overflow-y-auto mb-8 pr-1 custom-scrollbar">
+        <div className="grid grid-cols-2 gap-3">
+          {traits.map(trait => (
+            <button 
+              key={trait}
+              onClick={() => toggleTrait(trait)}
+              className={`p-4 card-surface font-bold text-sm transition-all text-center ${selectedTraits.includes(trait) ? 'bg-accent/20 border-accent text-accent glowing-accent' : 'hover:border-white/20'}`}
+            >
+              {trait}
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-6 shrink-0 pb-8 border-t border-white/5 pt-6">
         <div className="p-4 card-surface flex items-center justify-between">
           <div className="flex items-center gap-3">
             <input 
@@ -799,19 +962,19 @@ function VotingScreen({ friend, onBack, onVote }: any) {
           <Lock size={18} className="text-white/20" />
         </div>
 
-        <div className="bg-white/5 p-4 rounded-xl space-y-2 mb-4">
+        <div className="bg-white/5 p-4 rounded-xl space-y-2">
            <h4 className="text-[10px] uppercase font-bold tracking-widest text-white/40 flex items-center gap-2">
              <Info size={12} /> Anti-abuse note
            </h4>
            <p className="text-xs text-white/60 italic leading-relaxed">Each person can only vote once. Votes are intentional and non-reversible.</p>
         </div>
 
-        <Button onClick={submit} disabled={selectedTraits.length === 0 || !isCaptchadone}>
+        <Button onClick={submit} disabled={selectedTraits.length === 0 || !isCaptchadone} variant="primary">
           Submit vote →
         </Button>
       </div>
     </div>
-  )
+  );
 }
 
 function StaticScreen({ title, onBack }: any) {
@@ -842,6 +1005,93 @@ function StaticScreen({ title, onBack }: any) {
   )
 }
 
+function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
+  const [message, setMessage] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [friend.messages]);
+
+  const send = (e: any) => {
+    e.preventDefault();
+    if (!message.trim()) return;
+    onSendMessage(message);
+    setMessage('');
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col h-screen overflow-hidden bg-background">
+      <div className="p-4 border-b border-white/5 flex items-center gap-4 bg-surface/50 backdrop-blur-md sticky top-0 z-10 shrink-0">
+        <button onClick={onBack}><ChevronLeft /></button>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            {friend.avatar ? (
+              <img src={friend.avatar} className="w-10 h-10 rounded-full object-cover border-2 border-accent/20" alt="" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-surface flex items-center justify-center text-white/20 font-black text-xs">
+                {friend.displayName[0]}
+              </div>
+            )}
+            <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${friend.status === 'online' ? 'bg-green-500' : 'bg-white/20'}`} />
+          </div>
+          <div>
+            <p className="font-bold text-sm leading-none mb-1">{friend.displayName}</p>
+            <p className={`text-[10px] font-bold uppercase tracking-widest leading-none ${friend.status === 'online' ? 'text-green-500' : 'text-white/20'}`}>
+              {friend.status === 'online' ? 'Online' : 'Offline'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+        {friend.messages.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
+            <MessageCircle size={48} className="mb-4" />
+            <p className="text-xs font-bold uppercase tracking-widest">No messages yet</p>
+            <p className="text-[10px]">Start the conversation below</p>
+          </div>
+        )}
+        {friend.messages.map((m: any) => (
+          <div key={m.id} className={`flex ${m.senderId === 'me' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+              m.senderId === 'me' 
+                ? 'bg-accent text-background font-medium rounded-tr-none shadow-lg shadow-accent/10' 
+                : 'bg-surface border border-white/5 rounded-tl-none'
+            }`}>
+              {m.text}
+              <p className={`text-[8px] mt-1 opacity-50 font-bold text-right ${m.senderId === 'me' ? 'text-black/60' : 'text-white/40'}`}>
+                {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={send} className="p-4 border-t border-white/5 bg-surface/30 shrink-0">
+        <div className="flex gap-2">
+          <input 
+            type="text" 
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Type a message..." 
+            className="flex-1 bg-surface border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-accent/50 transition-colors"
+          />
+          <button 
+            type="submit"
+            disabled={!message.trim()}
+            className="bg-accent text-background p-3 rounded-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 shadow-lg shadow-accent/20"
+          >
+            <Send size={20} />
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onNavigate }: any) {
   return (
     <motion.div 
@@ -860,7 +1110,13 @@ function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onNavigate }: an
         <div className="w-12 h-1 bg-white/10 rounded-full mx-auto mb-6" />
         
         <div className="flex items-center gap-4 mb-8">
-          <img src={user.avatar} className="w-16 h-16 rounded-full border-2 border-accent object-cover" alt="" />
+          {user.avatar ? (
+            <img src={user.avatar} className="w-16 h-16 rounded-full border-2 border-accent object-cover" alt="" />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-surface border-2 border-accent/20 flex items-center justify-center text-accent/20 font-black">
+              {user.displayName ? user.displayName[0] : '?'}
+            </div>
+          )}
           <div className="flex-1">
             <h3 className="text-xl font-bold font-display">{user.displayName}</h3>
             <div className="flex items-center gap-2 mt-1">
@@ -957,7 +1213,13 @@ function PublicProfileScreen({ user, onBack }: any) {
       
       <Card className="w-full max-w-sm mt-8 flex flex-col items-center p-8 space-y-6">
         <div className="relative">
-          <img src={user.avatar} className="w-32 h-32 rounded-full border-4 border-accent shadow-2xl shadow-accent/20" alt="" />
+          {user.avatar ? (
+            <img src={user.avatar} className="w-32 h-32 rounded-full border-4 border-accent shadow-2xl shadow-accent/20" alt="" />
+          ) : (
+            <div className="w-32 h-32 rounded-full border-4 border-white/10 flex items-center justify-center bg-surface text-white/20 shadow-2xl shadow-accent/5">
+              <Sparkles size={48} />
+            </div>
+          )}
           {user.identityTitle && <Badge className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-4 py-1 text-[10px] glowing-accent font-bold">{user.identityTitle}</Badge>}
         </div>
         

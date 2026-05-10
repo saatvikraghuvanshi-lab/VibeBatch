@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { UserProfile, AuthState, PREDEFINED_TRAITS, SPONSORED_TRAITS, Trait } from './types';
+import { UserProfile, AuthState, PREDEFINED_TRAITS, SPONSORED_TRAITS, Trait } from '../lib/types';
 
-const STORAGE_KEY = 'vibebatch_storage';
+const STORAGE_KEY = 'vibebatch_storage_v3';
 
 const INITIAL_STATE: AuthState = {
   user: null,
@@ -23,14 +23,14 @@ export const saveStore = (state: AuthState) => {
 
 export const createMockUser = (data: Partial<UserProfile>): UserProfile => {
   const traits: Trait[] = [
-    ...PREDEFINED_TRAITS.map((t, i) => ({
+    ...PREDEFINED_TRAITS.map((t: { name?: string; category?: string }, i: number) => ({
       id: `trait-${i}`,
       name: t.name!,
       category: t.category!,
       votes: 0,
       voters: [],
     })),
-    ...SPONSORED_TRAITS.map((t, i) => ({
+    ...SPONSORED_TRAITS.map((t: { name?: string; category?: string; sponsoredBy?: string }, i: number) => ({
       id: `sponsored-${i}`,
       name: t.name!,
       category: t.category!,
