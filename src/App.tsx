@@ -8,6 +8,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { supabase } from '../lib/supabase';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -34,7 +35,7 @@ import {
   Send,
 } from 'lucide-react';
 import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
-import { getStore, saveStore, createMockUser } from '../lib/store';
+import { getStore, saveStore } from '../lib/store';
 import { generateIdentityTitle } from '../lib/gemini';
 
 // --- Components ---
@@ -94,58 +95,148 @@ export default function App() {
     saveStore(authState);
   }, [authState]);
 
-  const handleLogin = (e: any) => {
-    e.preventDefault();
+  const fetchUserProfile = async (username: string) => {
     setLoading(true);
-    setTimeout(() => {
-      const mockUser = createMockUser({ displayName: "", username: "" });
-      setAuthState({ user: mockUser, isAuthenticated: true });
-      setLoading(false);
-      setCurrentScreen('home');
-    }, 1500);
+    const cleanUsername = username.toLowerCase().replace('@', '');
+    
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*, traits(*)')
+      .eq('username', cleanUsername)
+      .single();
+
+    if (data) {
+      const mappedTraits = PREDEFINED_TRAITS.map(pt => ({
+        ...pt,
+        votes: data.traits?.find((t: any) => t.trait_id === pt.id)?.votes_count || 0
+      }));
+
+      setSelectedFriend({ 
+        ...data, 
+        displayName: data.display_name, 
+        avatar: data.avatar_url, 
+        traits: mappedTraits,
+        friends: [] 
+      } as any);
+      
+      setCurrentScreen('public-profile');
+    } else {
+      alert("No vibe found for that username.");
+    }
+    setLoading(false);
   };
 
-  const handleSignup = (e: any) => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const u = params.get('u');
+    if (u) fetchUserProfile(u);
+  }, []);
+
+  const handleLogin = async (e: any) => {
     e.preventDefault();
     setLoading(true);
     const formData = new FormData(e.target);
-    setTimeout(() => {
-      const mockUser = createMockUser({ 
-        displayName: formData.get('displayName') as string, 
-        username: (formData.get('displayName') as string).toLowerCase().replace(/\s/g, ''),
-        email: formData.get('email') as string,
-        contactNumber: formData.get('contact') as string
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      const { data: { user }, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
       });
-      setAuthState({ user: mockUser, isAuthenticated: true });
-      setLoading(false);
-      setCurrentScreen('home');
-    }, 1500);
-  };
+      
+      if (error) throw error;
 
-  const addFriend = (name: string) => {
-    if (!authState.user) return;
-    const newFriend: Friend = {
-      id: Math.random().toString(36).substr(2, 9),
-      displayName: name,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
-      friendshipDate: new Date().toISOString(),
-      hasVoted: false,
-      messagesCount: 0,
-      status: 'online',
-      messages: []
-    };
-    setAuthState({
-      ...authState,
-      user: {
-        ...authState.user,
-        friends: [newFriend, ...authState.user.friends]
+      if (user) {
+        const { data: p, error: pError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (pError) throw pError;
+
+        setAuthState({
+          user: { 
+            ...p, 
+            displayName: p.display_name, 
+            avatar: p.avatar_url, 
+            traits: PREDEFINED_TRAITS, 
+            friends: [] 
+          },
+          isAuthenticated: true
+        });
+        setCurrentScreen('home');
       }
-    });
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const sendMessage = (friendId: string, text: string) => {
+  const handleSignup = async (e: any) => {
+    e.preventDefault();
+    setLoading(true);
+    const formData = new FormData(e.target);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    const username = (formData.get('username') as string).toLowerCase().replace('@', '');
+    const displayName = formData.get('displayName') as string;
+
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            { 
+              id: authData.user.id, 
+              username, 
+              display_name: displayName,
+              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
+            }
+          ]);
+        
+        if (profileError) throw profileError;
+        
+        alert("Success! Check your email to verify, then log in.");
+        setIsLoginView(true);
+      }
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addFriend = async (name: string) => {
+    // This now initiates a search for a real user rather than creating a mock
+    await fetchUserProfile(name);
+  };
+
+  const sendMessage = async (friendId: string, text: string) => {
     if (!authState.user) return;
     
+    // 1. Persist to Cloud
+    const { error } = await supabase.from('messages').insert([{
+      sender_id: authState.user.id,
+      receiver_id: friendId,
+      content: text
+    }]);
+
+    if (error) {
+      console.error("Message failed:", error);
+      return;
+    }
+
+    // 2. Update local UI state to show message immediately
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       senderId: 'me',
@@ -167,43 +258,9 @@ export default function App() {
     
     setAuthState({
       ...authState,
-      user: {
-        ...authState.user,
-        friends: updatedFriends
-      }
+      user: { ...authState.user, friends: updatedFriends }
     });
-
-    // Mock auto-reply
-    setTimeout(() => {
-      if (!authState.user) return;
-      const replyMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        senderId: friendId,
-        text: "That's interesting! Tell me more.",
-        timestamp: new Date().toISOString(),
-        isRead: false
-      };
-      
-      setAuthState(current => {
-        if (!current.user) return current;
-        const autoReplyFriends = current.user.friends.map(f => {
-          if (f.id === friendId) {
-            return {
-              ...f,
-              messages: [...f.messages, replyMessage],
-              messagesCount: f.messagesCount + 1
-            };
-          }
-          return f;
-        });
-        return {
-          ...current,
-          user: { ...current.user, friends: autoReplyFriends }
-        };
-      });
-    }, 2000);
   };
-
   const logout = () => {
     setAuthState({ user: null, isAuthenticated: false });
     setCurrentScreen('login');
@@ -235,7 +292,7 @@ export default function App() {
 
   // --- Screen Components ---
 
-  const AuthScreen = () => (
+  const AuthScreen = ({ onLogin, onSignup, isLoginView, setIsLoginView, loading }: any) => (
     <div className="min-h-screen flex flex-col p-6 max-w-md mx-auto w-full">
       <div className="flex-1 flex flex-col justify-center gap-8 py-12">
         <div className="text-center space-y-2">
@@ -244,7 +301,7 @@ export default function App() {
         </div>
 
         {isLoginView ? (
-          <form className="space-y-4" onSubmit={handleLogin}>
+          <form className="space-y-4" onSubmit={onLogin}>
             <div className="space-y-4">
               <input type="email" placeholder="Email" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
               <input type="password" placeholder="Password" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
@@ -266,7 +323,7 @@ export default function App() {
             </div>
           </form>
         ) : (
-          <form className="space-y-4" onSubmit={handleSignup}>
+          <form className="space-y-4" onSubmit={onSignup}>
             <div className="flex flex-col items-center gap-4 mb-4">
               <div className="w-24 h-24 rounded-full bg-surface border-2 border-dashed border-white/20 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-accent/50 transition-colors">
                 <Camera className="w-6 h-6 text-white/40" />
@@ -534,11 +591,18 @@ export default function App() {
       <p className="text-[10px] text-white/10 font-bold tracking-widest">© 2026 VIBEBATCH</p>
     </footer>
   );
-
-  // --- Sub-Screens placeholder (Voting, Friends, Traits, etc.) ---
+// --- Sub-Screens placeholder (Voting, Friends, Traits, etc.) ---
   
   if (!authState.isAuthenticated) {
-    return <AuthScreen />;
+    return (
+      <AuthScreen 
+        onLogin={handleLogin} 
+        onSignup={handleSignup} 
+        isLoginView={isLoginView} 
+        setIsLoginView={setIsLoginView} 
+        loading={loading} 
+      />
+    );
   }
 
   return (
@@ -551,42 +615,106 @@ export default function App() {
           exit={{ opacity: 0, x: -10 }}
           transition={{ duration: 0.2 }}
         >
-          {currentScreen === 'home' && <HomeScreen />}
-          {currentScreen === 'friends' && (
+          {currentScreen === 'home' && authState.user && (
+            <HomeScreen 
+              user={authState.user} 
+              onOpenProfile={() => setIsProfileSheetOpen(true)}
+              onSearch={fetchUserProfile}
+              onNavigate={setCurrentScreen}
+              loading={loading}
+            />
+          )}
+
+          {currentScreen === 'friends' && authState.user && (
             <FriendsScreen 
               onBack={() => setCurrentScreen('home')} 
-              user={authState.user!} 
-              onChat={(friend: Friend) => { setSelectedFriend(friend); setCurrentScreen('chat'); }} 
+              user={authState.user} 
+              onChat={(friend: Friend) => { 
+                setSelectedFriend(friend); 
+                setCurrentScreen('chat'); 
+              }} 
               onAddFriend={addFriend}
             />
           )}
-          {currentScreen === 'traits' && <TraitsScreen onBack={() => setCurrentScreen('home')} user={authState.user!} />}
-          {currentScreen === 'hourglass' && <HourglassScreen onBack={() => setCurrentScreen('home')} user={authState.user!} />}
-          {currentScreen === 'tracker' && <VoteTrackerScreen onBack={() => setCurrentScreen('home')} user={authState.user!} />}
-          {currentScreen === 'public-profile' && <PublicProfileScreen user={authState.user!} onBack={() => setCurrentScreen('home')} />}
-          {currentScreen === 'storycard' && <StoryCardGeneratorScreen user={authState.user!} onBack={() => setCurrentScreen('home')} />}
-          {currentScreen === 'chat' && (
-            <ChatDetailScreen 
-              friend={authState.user!.friends.find(f => f.id === selectedFriend?.id)!} 
-              onBack={() => setCurrentScreen('friends')} 
-              onSendMessage={(text: string) => sendMessage(selectedFriend!.id, text)}
+
+          {currentScreen === 'traits' && authState.user && (
+            <TraitsScreen onBack={() => setCurrentScreen('home')} user={authState.user} />
+          )}
+          
+          {currentScreen === 'hourglass' && authState.user && (
+            <HourglassScreen onBack={() => setCurrentScreen('home')} user={authState.user} />
+          )}
+          
+          {currentScreen === 'tracker' && authState.user && (
+            <VoteTrackerScreen onBack={() => setCurrentScreen('home')} user={authState.user} />
+          )}
+          
+          {currentScreen === 'public-profile' && selectedFriend && (
+            <PublicProfileScreen 
+              user={selectedFriend} 
+              onBack={() => setCurrentScreen('home')} 
+              onVote={() => setCurrentScreen('voting')}
             />
           )}
-          {currentScreen === 'voting' && <VotingScreen friend={selectedFriend!} onBack={() => setCurrentScreen('home')} onVote={(traits: string[]) => {
-             // Mock vote update
-             if (authState.user) {
-               const updatedFriends = authState.user.friends.map(f => f.id === selectedFriend?.id ? { ...f, hasVoted: true } : f);
-               setAuthState({ ...authState, user: { ...authState.user, friends: updatedFriends } });
-               setCurrentScreen('home');
-             }
-          }}/>}
+
+          {currentScreen === 'storycard' && authState.user && (
+            <StoryCardGeneratorScreen user={authState.user} onBack={() => setCurrentScreen('home')} />
+          )}
+          
+          {currentScreen === 'chat' && selectedFriend && (
+            <ChatDetailScreen 
+              friend={selectedFriend} 
+              onBack={() => setCurrentScreen('friends')} 
+              onSendMessage={(text: string) => sendMessage(selectedFriend.id, text)}
+            />
+          )}
+
+          {currentScreen === 'voting' && selectedFriend && authState.user && (
+            <VotingScreen 
+              friend={selectedFriend} 
+              onBack={() => setCurrentScreen('public-profile')} 
+              onVote={async (traits: string[]) => {
+                if (selectedFriend && authState.user) {
+                  setLoading(true);
+                  try {
+                    await Promise.all(traits.map(traitId => 
+                      supabase.rpc('increment_trait_vote', { 
+                        target_user_id: selectedFriend.id, 
+                        trait_name: traitId 
+                      })
+                    ));
+
+                    const updatedFriends = authState.user.friends.map(f => 
+                      f.id === selectedFriend.id ? { ...f, hasVoted: true } : f
+                    );
+                    
+                    setAuthState(prev => ({ 
+                      ...prev, 
+                      user: prev.user ? { ...prev.user, friends: updatedFriends } : null 
+                    }));
+
+                    setCurrentScreen('home');
+                  } catch (err) {
+                    console.error(err);
+                    alert("Failed to send vibes.");
+                  } finally {
+                    setLoading(false);
+                  }
+                }
+              }}
+            />
+          )}
+
           {['about', 'help', 'terms', 'privacy'].includes(currentScreen) && (
-            <StaticScreen title={currentScreen} onBack={() => setCurrentScreen('home')} />
+            <StaticScreen 
+              title={currentScreen as any} 
+              onBack={() => setCurrentScreen('home')} 
+            />
           )}
         </motion.div>
       </AnimatePresence>
 
-      {/* Profile Sheet */}
+  {/* Profile Sheet */}
       <AnimatePresence>
         {isProfileSheetOpen && (
           <ProfileSheet 
@@ -601,6 +729,8 @@ export default function App() {
     </div>
   );
 }
+
+
 
 // --- Screen Sub-components ---
 
@@ -1331,3 +1461,4 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     </div>
   );
 }
+

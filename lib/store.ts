@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { UserProfile, AuthState, PREDEFINED_TRAITS, SPONSORED_TRAITS, Trait } from '../lib/types';
+import { UserProfile, AuthState, PREDEFINED_TRAITS, SPONSORED_TRAITS, Trait } from './types';
 
 const STORAGE_KEY = 'vibebatch_storage_v3';
 
