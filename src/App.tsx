@@ -199,49 +199,43 @@ export default function App() {
     const displayName = formData.get('displayName') as string;
 
     try {
+      let avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+
+      if (signupAvatarFile) {
+        const fileExt = signupAvatarFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const filePath = `pending/${crypto.randomUUID()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, signupAvatarFile, {
+            cacheControl: '3600',
+            contentType: signupAvatarFile.type || 'image/jpeg',
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+        avatarUrl = publicUrlData.publicUrl;
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            username,
+            display_name: displayName,
+            avatar_url: avatarUrl,
+          },
+        },
       });
 
       if (authError) throw authError;
 
       if (authData.user) {
-        let avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
-
-        if (signupAvatarFile) {
-          const fileExt = signupAvatarFile.name.split('.').pop()?.toLowerCase() || 'jpg';
-          const filePath = `${authData.user.id}/avatar-${Date.now()}.${fileExt}`;
-          const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(filePath, signupAvatarFile, {
-              cacheControl: '3600',
-              contentType: signupAvatarFile.type || 'image/jpeg',
-              upsert: true,
-            });
-
-          if (uploadError) throw uploadError;
-
-          const { data: publicUrlData } = supabase.storage
-            .from('avatars')
-            .getPublicUrl(filePath);
-
-          avatarUrl = publicUrlData.publicUrl;
-        }
-
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            { 
-              id: authData.user.id, 
-              username, 
-              display_name: displayName,
-              avatar_url: avatarUrl
-            }
-          ]);
-        
-        if (profileError) throw profileError;
-        
         alert("Success! Check your email to verify, then log in.");
         handleSignupAvatarChange(null);
         setIsLoginView(true);
