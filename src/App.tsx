@@ -90,10 +90,24 @@ export default function App() {
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [loading, setLoading] = useState(false);
   const [isLoginView, setIsLoginView] = useState(false);
+  const [signupAvatarFile, setSignupAvatarFile] = useState<File | null>(null);
+  const [signupAvatarPreview, setSignupAvatarPreview] = useState('');
 
   useEffect(() => {
     saveStore(authState);
   }, [authState]);
+
+  useEffect(() => {
+    return () => {
+      if (signupAvatarPreview) URL.revokeObjectURL(signupAvatarPreview);
+    };
+  }, [signupAvatarPreview]);
+
+  const handleSignupAvatarChange = (file: File | null) => {
+    if (signupAvatarPreview) URL.revokeObjectURL(signupAvatarPreview);
+    setSignupAvatarFile(file);
+    setSignupAvatarPreview(file ? URL.createObjectURL(file) : '');
+  };
 
   const fetchUserProfile = async (username: string) => {
     setLoading(true);
@@ -193,6 +207,28 @@ export default function App() {
       if (authError) throw authError;
 
       if (authData.user) {
+        let avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
+
+        if (signupAvatarFile) {
+          const fileExt = signupAvatarFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+          const filePath = `${authData.user.id}/avatar-${Date.now()}.${fileExt}`;
+          const { error: uploadError } = await supabase.storage
+            .from('avatars')
+            .upload(filePath, signupAvatarFile, {
+              cacheControl: '3600',
+              contentType: signupAvatarFile.type || 'image/jpeg',
+              upsert: true,
+            });
+
+          if (uploadError) throw uploadError;
+
+          const { data: publicUrlData } = supabase.storage
+            .from('avatars')
+            .getPublicUrl(filePath);
+
+          avatarUrl = publicUrlData.publicUrl;
+        }
+
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([
@@ -200,13 +236,14 @@ export default function App() {
               id: authData.user.id, 
               username, 
               display_name: displayName,
-              avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`
+              avatar_url: avatarUrl
             }
           ]);
         
         if (profileError) throw profileError;
         
         alert("Success! Check your email to verify, then log in.");
+        handleSignupAvatarChange(null);
         setIsLoginView(true);
       }
     } catch (err: any) {
@@ -292,7 +329,7 @@ export default function App() {
 
   // --- Screen Components ---
 
-  const AuthScreen = ({ onLogin, onSignup, isLoginView, setIsLoginView, loading }: any) => (
+  const AuthScreen = ({ onLogin, onSignup, isLoginView, setIsLoginView, loading, avatarPreview, onAvatarChange }: any) => (
     <div className="min-h-screen flex flex-col p-6 max-w-md mx-auto w-full">
       <div className="flex-1 flex flex-col justify-center gap-8 py-12">
         <div className="text-center space-y-2">
@@ -325,10 +362,23 @@ export default function App() {
         ) : (
           <form className="space-y-4" onSubmit={onSignup}>
             <div className="flex flex-col items-center gap-4 mb-4">
-              <div className="w-24 h-24 rounded-full bg-surface border-2 border-dashed border-white/20 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-accent/50 transition-colors">
-                <Camera className="w-6 h-6 text-white/40" />
-                <span className="text-[10px] text-white/40 uppercase font-bold">Upload</span>
-              </div>
+              <label className="w-24 h-24 rounded-full bg-surface border-2 border-dashed border-white/20 flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-accent/50 transition-colors overflow-hidden">
+                {avatarPreview ? (
+                  <img src={avatarPreview} className="w-full h-full object-cover" alt="Profile preview" />
+                ) : (
+                  <>
+                    <Camera className="w-6 h-6 text-white/40" />
+                    <span className="text-[10px] text-white/40 uppercase font-bold">Upload</span>
+                  </>
+                )}
+                <input
+                  name="avatar"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onAvatarChange(e.target.files?.[0] || null)}
+                />
+              </label>
             </div>
             <div className="space-y-4">
               <input name="displayName" type="text" placeholder="Display Name" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
@@ -602,6 +652,8 @@ export default function App() {
         isLoginView={isLoginView} 
         setIsLoginView={setIsLoginView} 
         loading={loading} 
+        avatarPreview={signupAvatarPreview}
+        onAvatarChange={handleSignupAvatarChange}
       />
     );
   }
