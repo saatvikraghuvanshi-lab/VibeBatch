@@ -162,19 +162,45 @@ export default function App() {
       if (error) throw error;
 
       if (user) {
-        const { data: p, error: pError } = await supabase
+        const { data: existingProfile, error: pError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
         if (pError) throw pError;
 
+        let profile = existingProfile;
+
+        if (!profile) {
+          const fallbackUsername = user.user_metadata?.username || email.split('@')[0].toLowerCase();
+          const fallbackDisplayName = user.user_metadata?.display_name || fallbackUsername;
+          const fallbackAvatarUrl =
+            user.user_metadata?.avatar_url ||
+            `https://api.dicebear.com/7.x/avataaars/svg?seed=${fallbackUsername}`;
+
+          const { data: createdProfile, error: createProfileError } = await supabase
+            .from('profiles')
+            .insert([
+              {
+                id: user.id,
+                username: fallbackUsername,
+                display_name: fallbackDisplayName,
+                avatar_url: fallbackAvatarUrl,
+              },
+            ])
+            .select('*')
+            .single();
+
+          if (createProfileError) throw createProfileError;
+          profile = createdProfile;
+        }
+
         setAuthState({
           user: { 
-            ...p, 
-            displayName: p.display_name, 
-            avatar: p.avatar_url, 
+            ...profile, 
+            displayName: profile.display_name, 
+            avatar: profile.avatar_url, 
             traits: PREDEFINED_TRAITS, 
             friends: [] 
           },
