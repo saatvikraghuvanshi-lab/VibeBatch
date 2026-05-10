@@ -81,6 +81,17 @@ const Badge = ({ children, color = "accent", className = "" }: any) => {
   );
 };
 
+const mapProfileToFriend = (profile: any, friendshipDate?: string): Friend => ({
+  id: profile.id,
+  displayName: profile.display_name || profile.username || 'New friend',
+  avatar: profile.avatar_url || '',
+  friendshipDate: friendshipDate || new Date().toISOString(),
+  hasVoted: false,
+  messagesCount: 0,
+  status: 'offline',
+  messages: [],
+});
+
 // --- App Root ---
 
 export default function App() {
@@ -107,6 +118,73 @@ export default function App() {
     if (signupAvatarPreview) URL.revokeObjectURL(signupAvatarPreview);
     setSignupAvatarFile(file);
     setSignupAvatarPreview(file ? URL.createObjectURL(file) : '');
+  };
+
+  const refreshFriends = async (userId: string) => {
+    const { data: links, error: linksError } = await supabase
+      .from('friendships')
+      .select('friend_id, created_at')
+      .eq('user_id', userId);
+
+    if (linksError) {
+      console.warn('Could not load friends yet:', linksError.message);
+      return [];
+    }
+
+    const friendIds = (links || []).map((link: any) => link.friend_id);
+    if (friendIds.length === 0) return [];
+
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('*')
+      .in('id', friendIds);
+
+    if (profilesError) throw profilesError;
+
+    return (profiles || []).map((profile: any) => {
+      const link = links?.find((item: any) => item.friend_id === profile.id);
+      return mapProfileToFriend(profile, link?.created_at);
+    });
+  };
+
+  const acceptInvite = async (inviterId: string, currentUserId: string) => {
+    if (!inviterId || inviterId === currentUserId) return;
+
+    const rows = [
+      { user_id: currentUserId, friend_id: inviterId },
+      { user_id: inviterId, friend_id: currentUserId },
+    ];
+
+    const { error } = await supabase
+      .from('friendships')
+      .upsert(rows, { onConflict: 'user_id,friend_id', ignoreDuplicates: true });
+
+    if (error) throw error;
+    window.localStorage.removeItem('vibebatch_pending_invite');
+  };
+
+  const applyPendingInvite = async (userId: string) => {
+    const pendingInvite = window.localStorage.getItem('vibebatch_pending_invite');
+    if (!pendingInvite) return;
+
+    try {
+      await acceptInvite(pendingInvite, userId);
+    } catch (error) {
+      console.error('Failed to accept invite:', error);
+    }
+  };
+
+  const buildInviteLink = () => {
+    if (!authState.user) return '';
+    return `${window.location.origin}${window.location.pathname}?invite=${authState.user.id}`;
+  };
+
+  const copyInviteLink = async () => {
+    const link = buildInviteLink();
+    if (!link) return;
+
+    await navigator.clipboard.writeText(link);
+    alert('Friend invite link copied. Send it to someone you want to add.');
   };
 
   const fetchUserProfile = async (username: string) => {
@@ -196,13 +274,16 @@ export default function App() {
           profile = createdProfile;
         }
 
+        await applyPendingInvite(user.id);
+        const friends = await refreshFriends(user.id);
+
         setAuthState({
           user: { 
             ...profile, 
             displayName: profile.display_name, 
             avatar: profile.avatar_url, 
             traits: PREDEFINED_TRAITS, 
-            friends: [] 
+            friends 
           },
           isAuthenticated: true
         });
@@ -255,6 +336,7 @@ export default function App() {
             username,
             display_name: displayName,
             avatar_url: avatarUrl,
+            invited_by: window.localStorage.getItem('vibebatch_pending_invite'),
           },
         },
       });
@@ -274,8 +356,90 @@ export default function App() {
   };
 
   const addFriend = async (name: string) => {
-    // This now initiates a search for a real user rather than creating a mock
     await fetchUserProfile(name);
+  };
+
+  const updateProfilePhoto = async (file: File) => {
+    if (!authState.user) return;
+    setLoading(true);
+
+    try {
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const filePath = `${authState.user.id}/profile-${Date.now()}.${fileExt}`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          contentType: file.type || 'image/jpeg',
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      const avatarUrl = publicUrlData.publicUrl;
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', authState.user.id);
+
+      if (updateError) throw updateError;
+
+      setAuthState(prev => ({
+        ...prev,
+        user: prev.user ? { ...prev.user, avatar: avatarUrl, avatar_url: avatarUrl } as any : null,
+      }));
+    } catch (err: any) {
+      alert(err.message || 'Failed to update profile photo.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateDisplayName = async () => {
+    if (!authState.user) return;
+    const displayName = window.prompt('Enter your new display name', authState.user.displayName);
+    if (!displayName?.trim()) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ display_name: displayName.trim() })
+        .eq('id', authState.user.id);
+
+      if (error) throw error;
+
+      setAuthState(prev => ({
+        ...prev,
+        user: prev.user ? { ...prev.user, displayName: displayName.trim(), display_name: displayName.trim() } as any : null,
+      }));
+    } catch (err: any) {
+      alert(err.message || 'Failed to update display name.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!authState.user) return;
+    const confirmed = window.confirm('Delete your VibeBatch account data? This removes your profile, friendships, and local session.');
+    if (!confirmed) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.rpc('delete_current_user');
+      if (error) throw error;
+      await supabase.auth.signOut();
+      logout();
+    } catch (err: any) {
+      alert(err.message || 'Failed to delete account.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const sendMessage = async (friendId: string, text: string) => {
@@ -319,6 +483,7 @@ export default function App() {
     });
   };
   const logout = () => {
+    supabase.auth.signOut();
     setAuthState({ user: null, isAuthenticated: false });
     setCurrentScreen('login');
     setIsProfileSheetOpen(false);
@@ -346,6 +511,26 @@ export default function App() {
       updateIdentity();
     }
   }, [authState.user?.traits]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const invite = params.get('invite');
+    if (!invite) return;
+
+    window.localStorage.setItem('vibebatch_pending_invite', invite);
+    if (authState.user) {
+      applyPendingInvite(authState.user.id).then(async () => {
+        const friends = await refreshFriends(authState.user!.id);
+        setAuthState(prev => ({
+          ...prev,
+          user: prev.user ? { ...prev.user, friends } : null,
+        }));
+      });
+    } else {
+      setIsLoginView(false);
+      setCurrentScreen('login');
+    }
+  }, [authState.user?.id]);
 
   // --- Screen Components ---
 
@@ -701,6 +886,7 @@ export default function App() {
                 setCurrentScreen('chat'); 
               }} 
               onAddFriend={addFriend}
+              onCopyInvite={copyInviteLink}
             />
           )}
 
@@ -789,6 +975,9 @@ export default function App() {
             onClose={() => setIsProfileSheetOpen(false)} 
             onLogout={logout} 
             onUpdateTitle={updateIdentity} 
+            onUpdatePhoto={updateProfilePhoto}
+            onUpdateDisplayName={updateDisplayName}
+            onDeleteAccount={deleteAccount}
             onNavigate={(s: string) => { setIsProfileSheetOpen(false); setCurrentScreen(s); }}
           />
         )}
@@ -801,12 +990,16 @@ export default function App() {
 
 // --- Screen Sub-components ---
 
-function FriendsScreen({ onBack, user, onChat, onAddFriend }: any) {
+function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite }: any) {
   const [newName, setNewName] = useState('');
 
   const submit = (e: any) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (!newName.trim()) {
+      onCopyInvite();
+      return;
+    }
+
     onAddFriend(newName);
     setNewName('');
   };
@@ -823,7 +1016,7 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend }: any) {
           <Users className="text-white/20" size={18} />
           <input 
             type="text" 
-            placeholder="Invite by name..." 
+            placeholder="Search username or copy invite link..." 
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             className="bg-transparent border-none outline-none w-full text-sm" 
@@ -1289,7 +1482,9 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
   );
 }
 
-function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onNavigate }: any) {
+function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onUpdatePhoto, onUpdateDisplayName, onDeleteAccount, onNavigate }: any) {
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -1318,14 +1513,33 @@ function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onNavigate }: an
             <h3 className="text-xl font-bold font-display">{user.displayName}</h3>
             <div className="flex items-center gap-2 mt-1">
                <span className="text-xs text-white/40">vibebatch.com/u/{user.username}</span>
-               <button className="text-accent"><Copy size={14} /></button>
+               <button
+                className="text-accent"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}?u=${user.username}`);
+                  alert('Profile link copied.');
+                }}
+               >
+                <Copy size={14} />
+               </button>
             </div>
           </div>
         </div>
 
         <div className="space-y-3">
-          <SheetOption icon={<Camera size={18} />} label="Update profile photo" />
-          <SheetOption icon={<Users size={18} />} label="Update display name" />
+          <input
+            ref={profilePhotoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUpdatePhoto(file);
+              e.target.value = '';
+            }}
+          />
+          <SheetOption icon={<Camera size={18} />} label="Update profile photo" onClick={() => profilePhotoInputRef.current?.click()} />
+          <SheetOption icon={<Users size={18} />} label="Update display name" onClick={onUpdateDisplayName} />
           <SheetOption icon={<Sparkles size={18} />} label="Manage custom traits" />
           <SheetOption icon={<Lock size={18} />} label="Reset password" />
           <SheetOption icon={<Download size={18} />} label="Download Story Card" onClick={() => onNavigate('storycard')} />
@@ -1339,7 +1553,7 @@ function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onNavigate }: an
                 <span className="font-bold">Log out</span>
                 <LogOut size={18} />
              </button>
-             <button className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-red-500/10 text-red-500 transition-colors">
+             <button onClick={onDeleteAccount} className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-red-500/10 text-red-500 transition-colors">
                 <span className="font-bold">Delete account</span>
                 <Trash2 size={18} />
              </button>
@@ -1400,7 +1614,7 @@ const TraitRow = ({ trait, total }: any) => {
   )
 }
 
-function PublicProfileScreen({ user, onBack }: any) {
+function PublicProfileScreen({ user, onBack, onVote }: any) {
   const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col items-center">
@@ -1443,7 +1657,7 @@ function PublicProfileScreen({ user, onBack }: any) {
            </div>
         </div>
 
-        <Button className="py-4">Vote for {user.displayName}'s traits →</Button>
+        <Button className="py-4" onClick={onVote}>Vote for {user.displayName}'s traits →</Button>
         <button className="flex items-center gap-2 text-white/40 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest">
            <Share2 size={14} /> Share profile
         </button>
@@ -1458,6 +1672,86 @@ function PublicProfileScreen({ user, onBack }: any) {
 
 function StoryCardGeneratorScreen({ user, onBack }: any) {
   const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
+
+  const downloadStoryCard = async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1080;
+    canvas.height = 1920;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = '#0B1020';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, 'rgba(0,229,255,0.28)');
+    gradient.addColorStop(1, 'rgba(11,16,32,0)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '700 72px Arial';
+    ctx.fillText(user.displayName || 'Your Name', canvas.width / 2, 680);
+
+    ctx.fillStyle = '#00E5FF';
+    ctx.font = '900 38px Arial';
+    ctx.fillText(user.identityTitle || 'IDENTITY LOCKED', canvas.width / 2, 760);
+
+    ctx.strokeStyle = '#00E5FF';
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, 430, 150, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (user.avatar) {
+      try {
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        image.src = user.avatar;
+        await new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = reject;
+        });
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, 430, 138, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.drawImage(image, canvas.width / 2 - 138, 292, 276, 276);
+        ctx.restore();
+      } catch {
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.beginPath();
+        ctx.arc(canvas.width / 2, 430, 138, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    topTraits.forEach((trait, index) => {
+      const x = 160 + index * 260;
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.roundRect(x, 900, 220, 140, 28);
+      ctx.fill();
+      ctx.fillStyle = '#00E5FF';
+      ctx.font = '900 34px Arial';
+      ctx.fillText(`#${index + 1}`, x + 110, 950);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '700 28px Arial';
+      ctx.fillText(trait.name || 'Trait', x + 110, 1008, 180);
+    });
+
+    ctx.fillStyle = '#00E5FF';
+    ctx.font = '900 76px Arial';
+    ctx.fillText('VibeBatch', canvas.width / 2, 1640);
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = '700 24px Arial';
+    ctx.fillText('YOUR FRIENDS KNOW YOU BEST', canvas.width / 2, 1700);
+
+    const link = document.createElement('a');
+    link.download = `vibebatch-${user.username || 'story-card'}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  };
   
   return (
     <div className="min-h-screen p-4 flex flex-col">
@@ -1517,7 +1811,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       </div>
 
       <div className="mt-8 space-y-3">
-        <Button className="flex items-center justify-center gap-3">
+        <Button className="flex items-center justify-center gap-3" onClick={downloadStoryCard}>
            <Download size={20} /> Download (Free)
         </Button>
         <button className="w-full p-4 rounded-xl border border-accent/30 text-accent font-bold text-sm flex items-center justify-center gap-2 bg-accent/5">
