@@ -26,6 +26,9 @@ export interface Friend {
   avatar: string;
   friendshipDate: string; // ISO string
   hasVoted: boolean;
+  relationshipLength?: string;
+  friendRelationshipLength?: string;
+  isVoteEligible?: boolean;
   messagesCount: number;
   status: 'online' | 'offline';
   messages: ChatMessage[];

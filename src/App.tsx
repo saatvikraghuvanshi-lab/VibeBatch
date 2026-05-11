@@ -81,16 +81,50 @@ const Badge = ({ children, color = "accent", className = "" }: any) => {
   );
 };
 
-const mapProfileToFriend = (profile: any, friendshipDate?: string): Friend => ({
+const FRIENDSHIP_LENGTH_OPTIONS = [
+  { value: 'lt_1_month', label: 'Less than one month', eligible: false },
+  { value: '1_3_months', label: '1-3 months', eligible: false },
+  { value: '3_5_months', label: '3-5 months', eligible: false },
+  { value: '6_12_months', label: '6-12 months', eligible: true },
+  { value: 'over_1_year', label: 'More than one year', eligible: true },
+];
+
+const isEligibleLength = (value?: string) => (
+  FRIENDSHIP_LENGTH_OPTIONS.some(option => option.value === value && option.eligible)
+);
+
+const getFriendshipLengthLabel = (value?: string) => (
+  FRIENDSHIP_LENGTH_OPTIONS.find(option => option.value === value)?.label || 'Choose duration'
+);
+
+const askFriendshipLength = (friendName: string) => {
+  const menu = FRIENDSHIP_LENGTH_OPTIONS
+    .map((option, index) => `${index + 1}. ${option.label}`)
+    .join('\n');
+  const answer = window.prompt(`How long have you known ${friendName} in real life?\n\n${menu}\n\nEnter 1-5:`);
+  const index = Number(answer) - 1;
+  return FRIENDSHIP_LENGTH_OPTIONS[index]?.value || null;
+};
+
+const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend => {
+  const relationshipLength = link?.relationship_length || '';
+  const friendRelationshipLength = reverseLink?.relationship_length || '';
+  const isVoteEligible = isEligibleLength(relationshipLength) && isEligibleLength(friendRelationshipLength);
+
+  return ({
   id: profile.id,
   displayName: profile.display_name || profile.username || 'New friend',
   avatar: profile.avatar_url || '',
-  friendshipDate: friendshipDate || new Date().toISOString(),
+  friendshipDate: link?.created_at || new Date().toISOString(),
   hasVoted: false,
+  relationshipLength,
+  friendRelationshipLength,
+  isVoteEligible,
   messagesCount: 0,
   status: 'offline',
   messages: [],
-});
+  });
+};
 
 // --- App Root ---
 
@@ -123,7 +157,7 @@ export default function App() {
   const refreshFriends = async (userId: string) => {
     const { data: links, error: linksError } = await supabase
       .from('friendships')
-      .select('friend_id, created_at')
+      .select('friend_id, relationship_length, created_at')
       .eq('user_id', userId);
 
     if (linksError) {
@@ -134,6 +168,14 @@ export default function App() {
     const friendIds = (links || []).map((link: any) => link.friend_id);
     if (friendIds.length === 0) return [];
 
+    const { data: reverseLinks, error: reverseLinksError } = await supabase
+      .from('friendships')
+      .select('user_id, friend_id, relationship_length')
+      .in('user_id', friendIds)
+      .eq('friend_id', userId);
+
+    if (reverseLinksError) throw reverseLinksError;
+
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
@@ -141,26 +183,56 @@ export default function App() {
 
     if (profilesError) throw profilesError;
 
+    const { data: messages, error: messagesError } = await supabase
+      .from('messages')
+      .select('*')
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .order('created_at', { ascending: true });
+
+    if (messagesError) {
+      console.warn('Could not load messages yet:', messagesError.message);
+    }
+
     return (profiles || []).map((profile: any) => {
       const link = links?.find((item: any) => item.friend_id === profile.id);
-      return mapProfileToFriend(profile, link?.created_at);
+      const reverseLink = reverseLinks?.find((item: any) => item.user_id === profile.id);
+      const friend = mapProfileToFriend(profile, link, reverseLink);
+      const friendMessages = (messages || [])
+        .filter((message: any) => (
+          (message.sender_id === userId && message.receiver_id === profile.id) ||
+          (message.sender_id === profile.id && message.receiver_id === userId)
+        ))
+        .map((message: any) => ({
+          id: message.id,
+          senderId: message.sender_id === userId ? 'me' : profile.id,
+          text: message.content,
+          timestamp: message.created_at,
+          isRead: message.sender_id === userId || Boolean(message.is_read),
+        }));
+
+      return {
+        ...friend,
+        messages: friendMessages,
+        messagesCount: friendMessages.filter((message: ChatMessage) => !message.isRead && message.senderId !== 'me').length,
+      };
     });
   };
 
-  const acceptInvite = async (inviterId: string, currentUserId: string) => {
+  const acceptInvite = async (inviterId: string, currentUserId: string, currentLength?: string | null, inviterLength?: string | null) => {
     if (!inviterId || inviterId === currentUserId) return;
 
     const rows = [
-      { user_id: currentUserId, friend_id: inviterId },
-      { user_id: inviterId, friend_id: currentUserId },
+      { user_id: currentUserId, friend_id: inviterId, relationship_length: currentLength || null },
+      { user_id: inviterId, friend_id: currentUserId, relationship_length: inviterLength || null },
     ];
 
     const { error } = await supabase
       .from('friendships')
-      .upsert(rows, { onConflict: 'user_id,friend_id', ignoreDuplicates: true });
+      .upsert(rows, { onConflict: 'user_id,friend_id' });
 
     if (error) throw error;
     window.localStorage.removeItem('vibebatch_pending_invite');
+    window.localStorage.removeItem('vibebatch_pending_invite_length');
   };
 
   const applyPendingInvite = async (userId: string) => {
@@ -168,19 +240,26 @@ export default function App() {
     if (!pendingInvite) return;
 
     try {
-      await acceptInvite(pendingInvite, userId);
+      const inviterLength = window.localStorage.getItem('vibebatch_pending_invite_length');
+      const currentLength = askFriendshipLength('this friend');
+      await acceptInvite(pendingInvite, userId, currentLength, inviterLength);
     } catch (error) {
       console.error('Failed to accept invite:', error);
     }
   };
 
-  const buildInviteLink = () => {
+  const buildInviteLink = (relationshipLength?: string) => {
     if (!authState.user) return '';
-    return `${window.location.origin}${window.location.pathname}?invite=${authState.user.id}`;
+    const params = new URLSearchParams({ invite: authState.user.id });
+    if (relationshipLength) params.set('known', relationshipLength);
+    return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
   };
 
   const copyInviteLink = async () => {
-    const link = buildInviteLink();
+    const relationshipLength = askFriendshipLength('the person receiving this link');
+    if (!relationshipLength) return;
+
+    const link = buildInviteLink(relationshipLength);
     if (!link) return;
 
     await navigator.clipboard.writeText(link);
@@ -356,7 +435,83 @@ export default function App() {
   };
 
   const addFriend = async (name: string) => {
-    await fetchUserProfile(name);
+    if (!authState.user) return;
+    const cleanUsername = name.toLowerCase().replace('@', '').trim();
+    if (!cleanUsername) return;
+
+    setLoading(true);
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('username', cleanUsername)
+        .single();
+
+      if (error || !profile) {
+        alert('No VibeBatch user found with that username.');
+        return;
+      }
+
+      if (profile.id === authState.user.id) {
+        alert('That is your own profile.');
+        return;
+      }
+
+      const relationshipLength = askFriendshipLength(profile.display_name || profile.username);
+      if (!relationshipLength) return;
+
+      const { error: friendshipError } = await supabase
+        .from('friendships')
+        .upsert([
+          { user_id: authState.user.id, friend_id: profile.id, relationship_length: relationshipLength },
+          { user_id: profile.id, friend_id: authState.user.id },
+        ], { onConflict: 'user_id,friend_id' });
+
+      if (friendshipError) throw friendshipError;
+
+      const friends = await refreshFriends(authState.user.id);
+      setAuthState(prev => ({
+        ...prev,
+        user: prev.user ? { ...prev.user, friends } : null,
+      }));
+      alert(`${profile.display_name || profile.username} is now your friend. They still need to set how long they have known you before voting can unlock.`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to add friend.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateFriendshipLength = async (friend: Friend) => {
+    if (!authState.user) return;
+
+    const relationshipLength = askFriendshipLength(friend.displayName);
+    if (!relationshipLength) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('friendships')
+        .upsert([
+          {
+            user_id: authState.user.id,
+            friend_id: friend.id,
+            relationship_length: relationshipLength,
+          },
+        ], { onConflict: 'user_id,friend_id' });
+
+      if (error) throw error;
+
+      const friends = await refreshFriends(authState.user.id);
+      setAuthState(prev => ({
+        ...prev,
+        user: prev.user ? { ...prev.user, friends } : null,
+      }));
+    } catch (err: any) {
+      alert(err.message || 'Failed to update friendship duration.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateProfilePhoto = async (file: File) => {
@@ -457,6 +612,16 @@ export default function App() {
       return;
     }
 
+    supabase.functions.invoke('send-message-email', {
+      body: {
+        receiverId: friendId,
+        senderName: authState.user.displayName,
+        preview: text.slice(0, 140),
+      },
+    }).catch((notifyError) => {
+      console.warn('Email notification function is not configured yet:', notifyError.message);
+    });
+
     // 2. Update local UI state to show message immediately
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -481,6 +646,29 @@ export default function App() {
       ...authState,
       user: { ...authState.user, friends: updatedFriends }
     });
+    setSelectedFriend(prev => (
+      prev?.id === friendId
+        ? { ...prev, messages: [...(prev.messages || []), newMessage] }
+        : prev
+    ));
+  };
+
+  const openChatWithFriend = async (friend: Friend) => {
+    setSelectedFriend({ ...friend, messagesCount: 0 });
+    setCurrentScreen('chat');
+
+    if (!authState.user) return;
+    await supabase
+      .from('messages')
+      .update({ is_read: true })
+      .eq('sender_id', friend.id)
+      .eq('receiver_id', authState.user.id);
+
+    const friends = await refreshFriends(authState.user.id);
+    setAuthState(prev => ({
+      ...prev,
+      user: prev.user ? { ...prev.user, friends } : null,
+    }));
   };
   const logout = () => {
     supabase.auth.signOut();
@@ -518,6 +706,8 @@ export default function App() {
     if (!invite) return;
 
     window.localStorage.setItem('vibebatch_pending_invite', invite);
+    const known = params.get('known');
+    if (known) window.localStorage.setItem('vibebatch_pending_invite_length', known);
     if (authState.user) {
       applyPendingInvite(authState.user.id).then(async () => {
         const friends = await refreshFriends(authState.user!.id);
@@ -615,7 +805,7 @@ export default function App() {
     if (!user) return null;
 
     const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
-    const eligibleFriends = user.friends.filter(f => !f.hasVoted);
+    const eligibleFriends = user.friends.filter(f => f.isVoteEligible);
 
     return (
       <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col p-4 lg:p-6 bg-background">
@@ -674,7 +864,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-3 w-full mb-8">
               <StatItem label="Total Votes" value={user.totalVotes} />
               <StatItem label="Friends" value={user.friends.length} />
-              <StatItem label="Eligible" value={user.friends.filter(f => !f.hasVoted).length} />
+              <StatItem label="Eligible" value={user.friends.filter(f => f.isVoteEligible).length} />
               <StatItem label="Voted Back" value={user.totalVotes > 0 ? "92%" : "—"} />
             </div>
 
@@ -761,12 +951,17 @@ export default function App() {
                       )}
                       <div className="flex-1">
                         <p className="text-xs font-bold">{friend.displayName}</p>
-                        <p className="text-[9px] opacity-50 font-medium">6 months friends</p>
+                        <p className="text-[9px] opacity-50 font-medium">{getFriendshipLengthLabel(friend.relationshipLength)}</p>
                       </div>
                       {friend.hasVoted ? (
                          <div className="flex items-center gap-1 text-accent font-bold text-[9px]">
                            <CheckCircle2 size={10} /> VOTED
                          </div>
+                      ) : !friend.isVoteEligible ? (
+                        <button
+                          className="bg-white/5 text-white/50 px-3 py-1 rounded-md text-[9px] font-black"
+                          onClick={() => updateFriendshipLength(friend)}
+                        >SET TIME</button>
                       ) : (
                         <button 
                           className="bg-accent text-background px-3 py-1 rounded-md text-[9px] font-black hover:scale-105 transition-transform"
@@ -881,12 +1076,10 @@ export default function App() {
             <FriendsScreen 
               onBack={() => setCurrentScreen('home')} 
               user={authState.user} 
-              onChat={(friend: Friend) => { 
-                setSelectedFriend(friend); 
-                setCurrentScreen('chat'); 
-              }} 
+              onChat={openChatWithFriend} 
               onAddFriend={addFriend}
               onCopyInvite={copyInviteLink}
+              onUpdateFriendshipLength={updateFriendshipLength}
             />
           )}
 
@@ -895,18 +1088,25 @@ export default function App() {
           )}
           
           {currentScreen === 'hourglass' && authState.user && (
-            <HourglassScreen onBack={() => setCurrentScreen('home')} user={authState.user} />
+            <HourglassScreen onBack={() => setCurrentScreen('home')} user={authState.user} onUpdateFriendshipLength={updateFriendshipLength} />
           )}
           
           {currentScreen === 'tracker' && authState.user && (
-            <VoteTrackerScreen onBack={() => setCurrentScreen('home')} user={authState.user} />
+            <VoteTrackerScreen onBack={() => setCurrentScreen('home')} user={authState.user} onUpdateFriendshipLength={updateFriendshipLength} />
           )}
           
           {currentScreen === 'public-profile' && selectedFriend && (
             <PublicProfileScreen 
               user={selectedFriend} 
               onBack={() => setCurrentScreen('home')} 
-              onVote={() => setCurrentScreen('voting')}
+              onVote={() => {
+                const friend = authState.user?.friends.find(f => f.id === selectedFriend.id);
+                if (!friend?.isVoteEligible) {
+                  alert('Voting unlocks after both friends confirm they have known each other for 6 months or more.');
+                  return;
+                }
+                setCurrentScreen('voting');
+              }}
             />
           )}
 
@@ -990,7 +1190,7 @@ export default function App() {
 
 // --- Screen Sub-components ---
 
-function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite }: any) {
+function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite, onUpdateFriendshipLength }: any) {
   const [newName, setNewName] = useState('');
 
   const submit = (e: any) => {
@@ -1005,7 +1205,7 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite }: any)
   };
 
   return (
-    <div className="min-h-screen p-4 pb-24">
+    <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack}><ChevronLeft /></button>
         <h2 className="text-xl font-bold font-display">Friends</h2>
@@ -1047,16 +1247,31 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite }: any)
                   {friend.messages.some(m => !m.isRead && m.senderId !== 'me') && <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
                 </p>
                 <p className="text-[10px] text-white/40 uppercase font-bold tracking-wider">
-                  {friend.status === 'online' ? 'Active Now' : 'Last seen 2h ago'}
+                  {friend.isVoteEligible ? 'Voting unlocked' : getFriendshipLengthLabel(friend.relationshipLength)}
                 </p>
               </div>
             </div>
-            <button 
-              onClick={() => onChat(friend)}
-              className="p-2 text-white/40 hover:text-accent transition-colors"
-            >
-              <MessageCircle size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              {!friend.relationshipLength && (
+                <button
+                  onClick={() => onUpdateFriendshipLength(friend)}
+                  className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-amber-500/10 text-amber-500 border border-amber-500/20"
+                >
+                  Set time
+                </button>
+              )}
+              <button 
+                onClick={() => onChat(friend)}
+                className="p-2 text-white/40 hover:text-accent transition-colors relative"
+              >
+                <MessageCircle size={18} />
+                {friend.messagesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 rounded-full bg-accent text-background text-[9px] font-black flex items-center justify-center">
+                    {friend.messagesCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         )) : (
           <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
@@ -1074,7 +1289,7 @@ function TraitsScreen({ onBack, user }: any) {
   const top3 = sortedTraits.slice(0, 3);
   
   return (
-    <div className="min-h-screen p-4 pb-24">
+    <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack}><ChevronLeft /></button>
         <h2 className="text-xl font-bold font-display">Traits</h2>
@@ -1157,18 +1372,12 @@ function TraitCategory({ label, traits, total, sponsored, custom }: any) {
   );
 }
 
-function HourglassScreen({ onBack, user }: any) {
-  const eligible = user.friends.filter((f: Friend) => {
-    const diff = Date.now() - new Date(f.friendshipDate).getTime();
-    return diff > 1000 * 60 * 60 * 24 * 30 * 6; // 6 months
-  });
-  const pending = user.friends.filter((f: Friend) => {
-    const diff = Date.now() - new Date(f.friendshipDate).getTime();
-    return diff <= 1000 * 60 * 60 * 24 * 30 * 6;
-  });
+function HourglassScreen({ onBack, user, onUpdateFriendshipLength }: any) {
+  const eligible = user.friends.filter((f: Friend) => f.isVoteEligible);
+  const notEligible = user.friends.filter((f: Friend) => !f.isVoteEligible);
 
   return (
-    <div className="min-h-screen p-4 pb-24">
+    <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack}><ChevronLeft /></button>
         <h2 className="text-xl font-bold font-display">Eligibility</h2>
@@ -1176,7 +1385,7 @@ function HourglassScreen({ onBack, user }: any) {
 
       <div className="bg-accent/5 border border-accent/20 p-4 rounded-2xl mb-8 flex gap-4">
         <Info className="text-accent shrink-0" />
-        <p className="text-xs text-white/70 leading-relaxed font-medium">To keep votes high-fidelity, only friends who have known you for <span className="text-accent font-bold">6 months or more</span> are eligible to vote on your identity.</p>
+        <p className="text-xs text-white/70 leading-relaxed font-medium">To keep votes high-fidelity, both friends must confirm they have known each other for <span className="text-accent font-bold">6 months or more</span> before anonymous trait voting unlocks.</p>
       </div>
 
       <div className="space-y-8">
@@ -1195,16 +1404,16 @@ function HourglassScreen({ onBack, user }: any) {
                   )}
                   <span className="font-bold text-sm">{f.displayName}</span>
                 </div>
-                <Badge color={f.hasVoted ? 'green' : 'accent'}>{f.hasVoted ? 'Voted' : 'Vote traits'}</Badge>
+                <Badge color={f.hasVoted ? 'green' : 'accent'}>{f.hasVoted ? 'Voted' : 'Eligible'}</Badge>
               </div>
             ))}
           </div>
         </section>
 
         <section className="space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-widest text-white/40 px-1">Not yet eligible</h3>
+          <h3 className="text-sm font-bold uppercase tracking-widest text-white/40 px-1">Needs duration check</h3>
           <div className="space-y-2">
-            {pending.map((f: Friend) => (
+            {notEligible.map((f: Friend) => (
               <div key={f.id} className="flex items-center justify-between p-3 card-surface opacity-60">
                 <div className="flex items-center gap-3">
                   {f.avatar ? (
@@ -1216,7 +1425,9 @@ function HourglassScreen({ onBack, user }: any) {
                   )}
                   <span className="font-bold text-sm">{f.displayName}</span>
                 </div>
-                <Badge color="amber">3mo left</Badge>
+                <button onClick={() => onUpdateFriendshipLength(f)}>
+                  <Badge color="amber">{f.relationshipLength ? 'Not eligible' : 'Set time'}</Badge>
+                </button>
               </div>
             ))}
           </div>
@@ -1226,22 +1437,22 @@ function HourglassScreen({ onBack, user }: any) {
   );
 }
 
-function VoteTrackerScreen({ onBack, user }: any) {
+function VoteTrackerScreen({ onBack, user, onUpdateFriendshipLength }: any) {
   const votedCount = user.friends.filter((f: Friend) => f.hasVoted).length;
-  const total = user.friends.length;
-  const participation = Math.round((votedCount / total) * 100);
+  const eligibleCount = user.friends.filter((f: Friend) => f.isVoteEligible).length;
+  const participation = Math.round((votedCount / eligibleCount) * 100) || 0;
 
   return (
-    <div className="min-h-screen p-4 pb-24">
+    <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack}><ChevronLeft /></button>
         <h2 className="text-xl font-bold font-display">Vote Tracker</h2>
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-8">
-        <StatCard label="Eligible Friends" value={total} />
+        <StatCard label="Eligible Friends" value={eligibleCount} />
         <StatCard label="Have Voted" value={votedCount} />
-        <StatCard label="Yet to vote" value={total - votedCount} />
+        <StatCard label="Yet to vote" value={Math.max(eligibleCount - votedCount, 0)} />
         <StatCard label="Participation %" value={`${participation}%`} />
       </div>
 
@@ -1260,7 +1471,13 @@ function VoteTrackerScreen({ onBack, user }: any) {
                  )}
                  <span className="font-bold text-sm">{friend.displayName}</span>
                </div>
-               <Badge color={friend.hasVoted ? 'green' : 'amber'}>{friend.hasVoted ? 'Voted' : 'Pending'}</Badge>
+               {friend.isVoteEligible ? (
+                 <Badge color={friend.hasVoted ? 'green' : 'accent'}>{friend.hasVoted ? 'Voted' : 'Eligible'}</Badge>
+               ) : (
+                 <button onClick={() => onUpdateFriendshipLength(friend)}>
+                   <Badge color="amber">{friend.relationshipLength ? 'Not eligible' : 'Set time'}</Badge>
+                 </button>
+               )}
              </div>
            ))}
         </div>
@@ -1271,8 +1488,8 @@ function VoteTrackerScreen({ onBack, user }: any) {
 
 function StatCard({ label, value }: any) {
   return (
-    <Card className="flex flex-col items-center justify-center py-6">
-      <span className="text-2xl font-bold font-display mb-1">{value}</span>
+    <Card className="flex flex-col items-center justify-center py-5 sm:py-6 min-h-[104px] sm:min-h-[128px]">
+      <span className="text-2xl sm:text-3xl font-bold font-display mb-1">{value}</span>
       <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">{label}</span>
     </Card>
   );
