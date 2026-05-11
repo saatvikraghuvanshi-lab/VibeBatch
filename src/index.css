@@ -19,15 +19,23 @@
 @layer base {
   body {
     @apply bg-background text-text-main font-sans selection:bg-accent selection:text-background;
+    background:
+      linear-gradient(135deg, rgba(255, 77, 109, 0.08), transparent 28%),
+      linear-gradient(180deg, #0B1020 0%, #090D1A 100%);
   }
 }
 
 .gradient-button {
-  @apply bg-gradient-to-br from-[#FF4D6D] to-[#D03E58] text-white font-bold py-4 px-6 rounded-lg hover:opacity-90 transition-opacity active:scale-[0.98];
+  @apply bg-gradient-to-br from-[#FF4D6D] via-[#FF6F89] to-[#B8324A] text-white font-bold py-4 px-6 rounded-lg hover:opacity-90 transition-opacity active:scale-[0.98];
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 12px 28px rgba(255, 77, 109, 0.18);
 }
 
 .card-surface {
-  @apply bg-surface rounded-[var(--radius-card)] border border-white/5;
+  @apply rounded-[var(--radius-card)] border border-white/5;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0)),
+    #161B33;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
 .glowing-accent {
@@ -35,7 +43,7 @@
 }
 
 .text-gradient {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FF4D6D] to-[#FF8FA3];
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FFFFFF] via-[#FF8FA3] to-[#FF4D6D];
 }
 
 .nav-pill {

@@ -22,6 +22,7 @@ export interface ChatMessage {
 
 export interface Friend {
   id: string;
+  username?: string;
   displayName: string;
   avatar: string;
   friendshipDate: string; // ISO string
@@ -29,6 +30,8 @@ export interface Friend {
   relationshipLength?: string;
   friendRelationshipLength?: string;
   isVoteEligible?: boolean;
+  traits?: Trait[];
+  totalVotes?: number;
   messagesCount: number;
   status: 'online' | 'offline';
   messages: ChatMessage[];

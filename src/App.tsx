@@ -110,16 +110,23 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   const relationshipLength = link?.relationship_length || '';
   const friendRelationshipLength = reverseLink?.relationship_length || '';
   const isVoteEligible = isEligibleLength(relationshipLength) && isEligibleLength(friendRelationshipLength);
+  const traits = PREDEFINED_TRAITS.map(pt => ({
+    ...pt,
+    votes: profile.traits?.find((t: any) => t.trait_id === pt.id || t.trait_name === pt.name)?.votes_count || 0,
+  })) as Trait[];
 
   return ({
   id: profile.id,
+  username: profile.username,
   displayName: profile.display_name || profile.username || 'New friend',
   avatar: profile.avatar_url || '',
   friendshipDate: link?.created_at || new Date().toISOString(),
-  hasVoted: false,
+  hasVoted: Boolean(link?.has_voted),
   relationshipLength,
   friendRelationshipLength,
   isVoteEligible,
+  traits,
+  totalVotes: profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0),
   messagesCount: 0,
   status: 'offline',
   messages: [],
@@ -133,6 +140,7 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<string>('home');
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
+  const [friendDetails, setFriendDetails] = useState<Friend | null>(null);
   const [loading, setLoading] = useState(false);
   const [isLoginView, setIsLoginView] = useState(false);
   const [signupAvatarFile, setSignupAvatarFile] = useState<File | null>(null);
@@ -157,7 +165,7 @@ export default function App() {
   const refreshFriends = async (userId: string) => {
     const { data: links, error: linksError } = await supabase
       .from('friendships')
-      .select('friend_id, relationship_length, created_at')
+      .select('friend_id, relationship_length, has_voted, created_at')
       .eq('user_id', userId);
 
     if (linksError) {
@@ -178,7 +186,7 @@ export default function App() {
 
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('*')
+      .select('*, traits(*)')
       .in('id', friendIds);
 
     if (profilesError) throw profilesError;
@@ -737,7 +745,7 @@ export default function App() {
       <div className="flex-1 flex flex-col justify-center gap-8 py-12">
         <div className="text-center space-y-2">
           <h1 className="text-5xl font-display font-bold text-gradient tracking-tight">VibeBatch</h1>
-          <p className="text-white/60 font-medium tracking-wide">How your friends really see you</p>
+          <p className="text-white/60 font-medium tracking-wide">Your Persona through a digital lens.</p>
         </div>
 
         {isLoginView ? (
@@ -813,7 +821,7 @@ export default function App() {
     if (!user) return null;
 
     const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
-    const eligibleFriends = user.friends.filter(f => f.isVoteEligible);
+    const eligibleFriends = user.friends.filter(f => f.isVoteEligible && !f.hasVoted);
     const votedFriends = user.friends.filter(f => f.hasVoted);
     const lockedFriends = user.friends.filter(f => !f.isVoteEligible);
 
@@ -823,7 +831,7 @@ export default function App() {
         <header className="flex justify-between items-center mb-6 lg:mb-8 px-2 max-w-7xl mx-auto w-full">
           <div>
             <h1 className="text-3xl lg:text-4xl font-display font-extrabold text-white leading-tight">VibeBatch</h1>
-            <p className="text-[10px] lg:text-xs text-accent font-bold tracking-[0.1em] uppercase">How your friends really see you</p>
+            <p className="text-[10px] lg:text-xs text-accent font-bold tracking-[0.1em] uppercase">Your Persona through a digital lens.</p>
           </div>
           
           <div className="flex items-center gap-4">
@@ -960,7 +968,12 @@ export default function App() {
                         </div>
                       )}
                       <div className="flex-1">
-                        <p className="text-xs font-bold">{friend.displayName}</p>
+                        <button
+                          className="text-xs font-bold hover:text-accent transition-colors text-left"
+                          onClick={() => setFriendDetails(friend)}
+                        >
+                          {friend.displayName}
+                        </button>
                         <p className="text-[9px] opacity-50 font-medium">{getFriendshipLengthLabel(friend.relationshipLength)}</p>
                       </div>
                       {friend.hasVoted ? (
@@ -1092,6 +1105,7 @@ export default function App() {
               onAddFriend={addFriend}
               onCopyInvite={copyInviteLink}
               onUpdateFriendshipLength={updateFriendshipLength}
+              onOpenDetails={setFriendDetails}
             />
           )}
 
@@ -1149,6 +1163,14 @@ export default function App() {
                       })
                     ));
 
+                    const { error: voteStateError } = await supabase
+                      .from('friendships')
+                      .update({ has_voted: true })
+                      .eq('user_id', authState.user.id)
+                      .eq('friend_id', selectedFriend.id);
+
+                    if (voteStateError) throw voteStateError;
+
                     const updatedFriends = authState.user.friends.map(f => 
                       f.id === selectedFriend.id ? { ...f, hasVoted: true } : f
                     );
@@ -1194,6 +1216,12 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {friendDetails && (
+          <FriendDetailsModal friend={friendDetails} onClose={() => setFriendDetails(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1202,7 +1230,75 @@ export default function App() {
 
 // --- Screen Sub-components ---
 
-function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite, onUpdateFriendshipLength }: any) {
+function FriendDetailsModal({ friend, onClose }: any) {
+  const topTraits = [...(friend.traits || [])]
+    .sort((a: Trait, b: Trait) => (b.votes || 0) - (a.votes || 0))
+    .filter((trait: Trait) => (trait.votes || 0) > 0)
+    .slice(0, 3);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+    >
+      <div className="absolute inset-0 bg-background/70 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ y: 16, scale: 0.98 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 16, scale: 0.98 }}
+        className="relative z-10 w-full max-w-sm card-surface p-6 shadow-2xl"
+      >
+        <div className="flex items-center gap-4 mb-6">
+          {friend.avatar ? (
+            <img src={friend.avatar} className="w-16 h-16 rounded-full border-2 border-accent object-cover" alt="" />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-background flex items-center justify-center text-white/20 font-black">
+              {friend.displayName?.[0] || '?'}
+            </div>
+          )}
+          <div className="min-w-0">
+            <h3 className="text-xl font-bold font-display truncate">{friend.displayName}</h3>
+            <p className="text-accent text-sm font-bold truncate">@{friend.username || friend.id}</p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="bg-background/60 border border-white/5 rounded-lg p-4">
+            <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mb-1">Friendship duration</p>
+            <p className="text-sm font-bold">{getFriendshipLengthLabel(friend.relationshipLength)}</p>
+            <p className="text-[10px] text-white/40 mt-1">
+              {friend.isVoteEligible ? 'Voting unlocked by both users.' : 'Voting unlocks when both users confirm 6 months or more.'}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mb-3">Top traits</p>
+            {topTraits.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {topTraits.map((trait: Trait) => (
+                  <Badge key={trait.id || trait.name} color="pink">{trait.name}</Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-white/40">No voted traits yet.</p>
+            )}
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="mt-6 w-full bg-white text-background py-3 rounded-lg text-xs font-black uppercase tracking-widest"
+        >
+          Close
+        </button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite, onUpdateFriendshipLength, onOpenDetails }: any) {
   const [newName, setNewName] = useState('');
 
   const submit = (e: any) => {
@@ -1254,10 +1350,13 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite, onUpda
                 <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${friend.status === 'online' ? 'bg-green-500' : 'bg-white/20'}`} />
               </div>
               <div>
-                <p className="font-bold flex items-center gap-2">
+                <button
+                  className="font-bold flex items-center gap-2 hover:text-accent transition-colors text-left"
+                  onClick={() => onOpenDetails(friend)}
+                >
                   {friend.displayName}
                   {friend.messages.some(m => !m.isRead && m.senderId !== 'me') && <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />}
-                </p>
+                </button>
                 <p className="text-[10px] text-white/40 uppercase font-bold tracking-wider">
                   {friend.isVoteEligible ? 'Voting unlocked' : getFriendshipLengthLabel(friend.relationshipLength)}
                 </p>
@@ -1456,8 +1555,9 @@ function HourglassScreen({ onBack, user, onUpdateFriendshipLength }: any) {
 
 function VoteTrackerScreen({ onBack, user, onUpdateFriendshipLength }: any) {
   const votedCount = user.friends.filter((f: Friend) => f.hasVoted).length;
-  const eligibleCount = user.friends.filter((f: Friend) => f.isVoteEligible).length;
-  const participation = Math.round((votedCount / eligibleCount) * 100) || 0;
+  const votePoolCount = user.friends.filter((f: Friend) => f.isVoteEligible).length;
+  const eligibleCount = user.friends.filter((f: Friend) => f.isVoteEligible && !f.hasVoted).length;
+  const participation = Math.round((votedCount / votePoolCount) * 100) || 0;
 
   return (
     <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
@@ -1469,7 +1569,7 @@ function VoteTrackerScreen({ onBack, user, onUpdateFriendshipLength }: any) {
       <div className="grid grid-cols-2 gap-3 mb-8">
         <StatCard label="Eligible Friends" value={eligibleCount} />
         <StatCard label="Have Voted" value={votedCount} />
-        <StatCard label="Yet to vote" value={Math.max(eligibleCount - votedCount, 0)} />
+        <StatCard label="Locked" value={user.friends.filter((f: Friend) => !f.isVoteEligible).length} />
         <StatCard label="Participation %" value={`${participation}%`} />
       </div>
 
