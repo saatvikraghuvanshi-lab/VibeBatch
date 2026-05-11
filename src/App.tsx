@@ -146,6 +146,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   const friendRelationshipLength = reverseLink?.relationship_length || '';
   const isVoteEligible = isEligibleLength(relationshipLength) && isEligibleLength(friendRelationshipLength);
   const traits = mapSupabaseTraits(profile.traits || []);
+  const totalVotes = profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
 
   return ({
   id: profile.id,
@@ -158,10 +159,29 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   friendRelationshipLength,
   isVoteEligible,
   traits,
-  totalVotes: profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0),
+  totalVotes,
   messagesCount: 0,
   status: 'offline',
   messages: [],
+  });
+};
+
+const mapProfileToUser = (profile: any, friends: Friend[] = []): UserProfile => {
+  const traits = mapSupabaseTraits(profile.traits || []);
+  const totalVotes = profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
+
+  return ({
+    ...profile,
+    displayName: profile.display_name || profile.displayName || profile.username || 'VibeBatch user',
+    username: profile.username || '',
+    email: profile.email || '',
+    contactNumber: profile.contact_number || profile.contactNumber || '',
+    avatar: profile.avatar_url || profile.avatar || '',
+    isPremium: Boolean(profile.is_premium || profile.isPremium),
+    traits,
+    identityTitle: profile.identity_title || profile.identityTitle,
+    friends,
+    totalVotes,
   });
 };
 
@@ -350,6 +370,37 @@ export default function App() {
     }
   };
 
+  const loadCurrentUserProfile = async (userId: string) => {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('*, traits(*)')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!profile) return null;
+
+    const friends = await refreshFriends(userId);
+    return mapProfileToUser(profile, friends);
+  };
+
+  const refreshCurrentUserProfile = useCallback(async () => {
+    const userId = authState.user?.id;
+    if (!userId) return;
+
+    try {
+      const user = await loadCurrentUserProfile(userId);
+      if (!user) return;
+
+      setAuthState(prev => ({
+        ...prev,
+        user: prev.user?.id === userId ? user : prev.user,
+      }));
+    } catch (error) {
+      console.warn('Could not refresh current profile:', error);
+    }
+  }, [authState.user?.id]);
+
   const fetchUserProfile = async (username: string) => {
     setLoading(true);
     const cleanUsername = username.toLowerCase().replace('@', '');
@@ -361,16 +412,15 @@ export default function App() {
       .single();
 
     if (data) {
-      const mappedTraits = PREDEFINED_TRAITS.map(pt => ({
-        ...pt,
-        votes: data.traits?.find((t: any) => t.trait_id === pt.id)?.votes_count || 0
-      }));
+      const mappedTraits = mapSupabaseTraits(data.traits || []);
+      const totalVotes = data.total_votes || mappedTraits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
 
       setSelectedFriend({ 
         ...data, 
         displayName: data.display_name, 
         avatar: data.avatar_url, 
         traits: mappedTraits,
+        totalVotes,
         friends: [] 
       } as any);
       
@@ -405,7 +455,7 @@ export default function App() {
       if (user) {
         const { data: existingProfile, error: pError } = await supabase
           .from('profiles')
-          .select('*')
+          .select('*, traits(*)')
           .eq('id', user.id)
           .maybeSingle();
         
@@ -430,7 +480,7 @@ export default function App() {
                 avatar_url: fallbackAvatarUrl,
               },
             ])
-            .select('*')
+            .select('*, traits(*)')
             .single();
 
           if (createProfileError) throw createProfileError;
@@ -440,13 +490,7 @@ export default function App() {
         const friends = await refreshFriends(user.id);
 
         setAuthState({
-          user: { 
-            ...profile, 
-            displayName: profile.display_name, 
-            avatar: profile.avatar_url, 
-            traits: PREDEFINED_TRAITS, 
-            friends 
-          },
+          user: mapProfileToUser(profile, friends),
           isAuthenticated: true
         });
         setCurrentScreen('home');
@@ -797,6 +841,19 @@ export default function App() {
   }, [authState.user?.traits]);
 
   useEffect(() => {
+    if (!authState.isAuthenticated || !authState.user?.id) return;
+
+    refreshCurrentUserProfile();
+    const interval = window.setInterval(refreshCurrentUserProfile, 15000);
+    window.addEventListener('focus', refreshCurrentUserProfile);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshCurrentUserProfile);
+    };
+  }, [authState.isAuthenticated, authState.user?.id, refreshCurrentUserProfile]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const invite = params.get('invite');
     if (!invite) return;
@@ -1037,7 +1094,7 @@ export default function App() {
             <div className="card-surface p-4 sm:p-6 flex-1 min-h-0 flex flex-col min-w-0">
                <h3 className="text-[10px] text-accent font-bold uppercase tracking-[0.2em] mb-6">Trait Breakdown</h3>
                <div className="space-y-5 overflow-y-auto pr-2 custom-scrollbar">
-                  {user.traits.sort((a,b) => b.votes - a.votes).slice(0, 8).map(trait => (
+                  {[...user.traits].sort((a,b) => b.votes - a.votes).slice(0, 8).map(trait => (
                     <TraitRow key={trait.id} trait={trait} total={user.totalVotes} />
                   ))}
                </div>
@@ -2093,7 +2150,7 @@ const StatItem = ({ label, value }: any) => (
 );
 
 const TraitRow = ({ trait, total }: any) => {
-  const percent = Math.round((trait.votes / total) * 100) || 0;
+  const percent = Math.round(((trait.votes || 0) / Math.max(total || 0, 1)) * 100) || 0;
   const isSponsored = trait.category === 'sponsored';
   const isCustom = trait.category === 'custom';
 
