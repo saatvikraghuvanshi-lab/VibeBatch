@@ -33,6 +33,7 @@ import {
   CheckCircle2,
   Clock,
   Send,
+  Share,
 } from 'lucide-react';
 import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
 import { getStore, saveStore } from '../lib/store';
@@ -141,6 +142,7 @@ export default function App() {
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [friendDetails, setFriendDetails] = useState<Friend | null>(null);
+  const [inviteLink, setInviteLink] = useState('');
   const [loading, setLoading] = useState(false);
   const [isLoginView, setIsLoginView] = useState(false);
   const [signupAvatarFile, setSignupAvatarFile] = useState<File | null>(null);
@@ -264,15 +266,29 @@ export default function App() {
     return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
   };
 
-  const copyInviteLink = async () => {
+  const createInviteLink = () => {
     const relationshipLength = askFriendshipLength('the person receiving this link');
-    if (!relationshipLength) return;
+    if (!relationshipLength) return '';
 
     const link = buildInviteLink(relationshipLength);
+    return link;
+  };
+
+  const copyInviteLink = async () => {
+    const link = inviteLink || createInviteLink();
     if (!link) return;
 
     await navigator.clipboard.writeText(link);
+    setInviteLink(link);
     alert('Friend invite link copied. Send it to someone you want to add.');
+  };
+
+  const openInviteScreen = () => {
+    const link = inviteLink || createInviteLink();
+    if (!link) return;
+
+    setInviteLink(link);
+    setCurrentScreen('invite');
   };
 
   const fetchUserProfile = async (username: string) => {
@@ -450,11 +466,21 @@ export default function App() {
 
     setLoading(true);
     try {
+      const existingFriend = authState.user.friends.find(friend => (
+        friend.username?.toLowerCase() === cleanUsername ||
+        friend.displayName.toLowerCase() === cleanUsername
+      ));
+
+      if (existingFriend) {
+        setFriendDetails(existingFriend);
+        return;
+      }
+
       const { data: profile, error } = await supabase
         .from('profiles')
-        .select('*')
-        .eq('username', cleanUsername)
-        .single();
+        .select('*, traits(*)')
+        .or(`username.eq.${cleanUsername},display_name.ilike.${cleanUsername}`)
+        .maybeSingle();
 
       if (error || !profile) {
         alert('No VibeBatch user found with that username.');
@@ -470,11 +496,11 @@ export default function App() {
       if (!relationshipLength) return;
 
       const { error: friendshipError } = await supabase
-        .from('friendships')
-        .upsert([
-          { user_id: authState.user.id, friend_id: profile.id, relationship_length: relationshipLength },
-          { user_id: profile.id, friend_id: authState.user.id },
-        ], { onConflict: 'user_id,friend_id' });
+          .from('friendships')
+          .upsert([
+            { user_id: authState.user.id, friend_id: profile.id, relationship_length: relationshipLength },
+            { user_id: profile.id, friend_id: authState.user.id, relationship_length: null },
+          ], { onConflict: 'user_id,friend_id' });
 
       if (friendshipError) throw friendshipError;
 
@@ -1103,9 +1129,17 @@ export default function App() {
               user={authState.user} 
               onChat={openChatWithFriend} 
               onAddFriend={addFriend}
-              onCopyInvite={copyInviteLink}
+              onOpenInvite={openInviteScreen}
               onUpdateFriendshipLength={updateFriendshipLength}
               onOpenDetails={setFriendDetails}
+            />
+          )}
+
+          {currentScreen === 'invite' && authState.user && (
+            <InviteFriendScreen
+              link={inviteLink}
+              onBack={() => setCurrentScreen('friends')}
+              onCopy={copyInviteLink}
             />
           )}
 
@@ -1298,13 +1332,94 @@ function FriendDetailsModal({ friend, onClose }: any) {
   );
 }
 
-function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite, onUpdateFriendshipLength, onOpenDetails }: any) {
+function InviteFriendScreen({ link, onBack, onCopy }: any) {
+  const message = `Join me on VibeBatch: ${link}`;
+  const encodedLink = encodeURIComponent(link);
+  const encodedMessage = encodeURIComponent(message);
+  const shareTargets = [
+    { label: 'WhatsApp', href: `https://wa.me/?text=${encodedMessage}` },
+    { label: 'Facebook', href: `https://www.facebook.com/sharer/sharer.php?u=${encodedLink}` },
+    { label: 'Instagram', href: `https://www.instagram.com/` },
+    { label: 'Snapchat', href: `https://www.snapchat.com/` },
+  ];
+
+  const nativeShare = async () => {
+    if (!navigator.share) {
+      await navigator.clipboard.writeText(link);
+      alert('Invite link copied. Open your preferred app and paste it.');
+      return;
+    }
+
+    await navigator.share({
+      title: 'Join me on VibeBatch',
+      text: 'Add me as a friend on VibeBatch.',
+      url: link,
+    });
+  };
+
+  return (
+    <div className="min-h-screen p-4 pb-24 max-w-3xl mx-auto w-full">
+      <div className="flex items-center gap-4 mb-8">
+        <button onClick={onBack}><ChevronLeft /></button>
+        <h2 className="text-xl font-bold font-display">Invite Friend</h2>
+      </div>
+
+      <div className="space-y-6">
+        <Card className="p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <Copy className="text-accent shrink-0 mt-1" size={20} />
+            <div>
+              <h3 className="font-bold">Copy invite link</h3>
+              <p className="text-xs text-white/50 mt-1 break-all">{link}</p>
+            </div>
+          </div>
+          <Button onClick={onCopy} className="flex items-center justify-center gap-2">
+            <Copy size={18} /> Copy Link
+          </Button>
+        </Card>
+
+        <Card className="p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <Share className="text-accent shrink-0 mt-1" size={20} />
+            <div>
+              <h3 className="font-bold">Share to apps</h3>
+              <p className="text-xs text-white/50 mt-1">Choose an app or use your device share menu.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {shareTargets.map(target => (
+              <a
+                key={target.label}
+                href={target.href}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-background/70 border border-white/10 rounded-xl p-4 text-center text-xs font-black uppercase tracking-wider hover:border-accent/40 hover:text-accent transition-colors"
+              >
+                {target.label}
+              </a>
+            ))}
+          </div>
+
+          <button
+            onClick={nativeShare}
+            className="w-full bg-accent/10 border border-accent/20 text-accent py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+          >
+            <Share2 size={18} /> More share options
+          </button>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function FriendsScreen({ onBack, user, onChat, onAddFriend, onOpenInvite, onUpdateFriendshipLength, onOpenDetails }: any) {
   const [newName, setNewName] = useState('');
 
   const submit = (e: any) => {
     e.preventDefault();
     if (!newName.trim()) {
-      onCopyInvite();
+      onOpenInvite();
       return;
     }
 
@@ -1339,7 +1454,7 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite, onUpda
         {user.friends.length > 0 ? user.friends.map((friend: Friend) => (
           <div key={friend.id} className="flex items-center justify-between p-3 card-surface">
             <div className="flex items-center gap-3">
-              <div className="relative">
+              <button className="relative" onClick={() => onOpenDetails(friend)}>
                 {friend.avatar ? (
                   <img src={friend.avatar} className="w-12 h-12 rounded-full object-cover" alt="" />
                 ) : (
@@ -1348,7 +1463,7 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite, onUpda
                   </div>
                 )}
                 <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${friend.status === 'online' ? 'bg-green-500' : 'bg-white/20'}`} />
-              </div>
+              </button>
               <div>
                 <button
                   className="font-bold flex items-center gap-2 hover:text-accent transition-colors text-left"
