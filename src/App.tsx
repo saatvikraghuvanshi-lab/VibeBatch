@@ -507,6 +507,7 @@ export default function App() {
         ...prev,
         user: prev.user ? { ...prev.user, friends } : null,
       }));
+      alert(`${getFriendshipLengthLabel(relationshipLength)} saved. Voting unlocks only after ${friend.displayName} also chooses 6-12 months or more than one year.`);
     } catch (err: any) {
       alert(err.message || 'Failed to update friendship duration.');
     } finally {
@@ -600,15 +601,19 @@ export default function App() {
   const sendMessage = async (friendId: string, text: string) => {
     if (!authState.user) return;
     
-    // 1. Persist to Cloud
-    const { error } = await supabase.from('messages').insert([{
-      sender_id: authState.user.id,
-      receiver_id: friendId,
-      content: text
-    }]);
+    const { data: insertedMessage, error } = await supabase
+      .from('messages')
+      .insert([{
+        sender_id: authState.user.id,
+        receiver_id: friendId,
+        content: text
+      }])
+      .select('id, content, created_at')
+      .single();
 
     if (error) {
       console.error("Message failed:", error);
+      alert(error.message || 'Message failed to send.');
       return;
     }
 
@@ -622,12 +627,11 @@ export default function App() {
       console.warn('Email notification function is not configured yet:', notifyError.message);
     });
 
-    // 2. Update local UI state to show message immediately
     const newMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: insertedMessage.id,
       senderId: 'me',
-      text,
-      timestamp: new Date().toISOString(),
+      text: insertedMessage.content,
+      timestamp: insertedMessage.created_at,
       isRead: true
     };
     
@@ -636,7 +640,6 @@ export default function App() {
         return {
           ...f,
           messages: [...(f.messages || []), newMessage],
-          messagesCount: (f.messagesCount || 0) + 1
         };
       }
       return f;
@@ -961,7 +964,9 @@ export default function App() {
                         <button
                           className="bg-white/5 text-white/50 px-3 py-1 rounded-md text-[9px] font-black"
                           onClick={() => updateFriendshipLength(friend)}
-                        >SET TIME</button>
+                        >
+                          {friend.relationshipLength ? 'WAITING' : 'SET TIME'}
+                        </button>
                       ) : (
                         <button 
                           className="bg-accent text-background px-3 py-1 rounded-md text-[9px] font-black hover:scale-105 transition-transform"
@@ -1260,6 +1265,11 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onCopyInvite, onUpda
                   Set time
                 </button>
               )}
+              {friend.relationshipLength && !friend.isVoteEligible && (
+                <span className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-white/5 text-white/40 border border-white/10">
+                  Waiting
+                </span>
+              )}
               <button 
                 onClick={() => onChat(friend)}
                 className="p-2 text-white/40 hover:text-accent transition-colors relative"
@@ -1426,7 +1436,7 @@ function HourglassScreen({ onBack, user, onUpdateFriendshipLength }: any) {
                   <span className="font-bold text-sm">{f.displayName}</span>
                 </div>
                 <button onClick={() => onUpdateFriendshipLength(f)}>
-                  <Badge color="amber">{f.relationshipLength ? 'Not eligible' : 'Set time'}</Badge>
+                  <Badge color="amber">{f.relationshipLength ? 'Waiting for friend' : 'Set time'}</Badge>
                 </button>
               </div>
             ))}
@@ -1475,7 +1485,7 @@ function VoteTrackerScreen({ onBack, user, onUpdateFriendshipLength }: any) {
                  <Badge color={friend.hasVoted ? 'green' : 'accent'}>{friend.hasVoted ? 'Voted' : 'Eligible'}</Badge>
                ) : (
                  <button onClick={() => onUpdateFriendshipLength(friend)}>
-                   <Badge color="amber">{friend.relationshipLength ? 'Not eligible' : 'Set time'}</Badge>
+                   <Badge color="amber">{friend.relationshipLength ? 'Waiting for friend' : 'Set time'}</Badge>
                  </button>
                )}
              </div>
