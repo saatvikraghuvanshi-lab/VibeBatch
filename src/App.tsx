@@ -98,6 +98,40 @@ const getFriendshipLengthLabel = (value?: string) => (
   FRIENDSHIP_LENGTH_OPTIONS.find(option => option.value === value)?.label || 'Choose duration'
 );
 
+const normalizeTraitName = (value: any) => String(value || '').trim().toLowerCase();
+
+const mapSupabaseTraits = (rows: any[] = []) => {
+  const mapped = PREDEFINED_TRAITS.map(pt => {
+    const traitName = pt.name || '';
+    const match = rows.find((row: any) => (
+      normalizeTraitName(row.trait_name) === normalizeTraitName(traitName) ||
+      normalizeTraitName(row.name) === normalizeTraitName(traitName) ||
+      normalizeTraitName(row.trait_id) === normalizeTraitName(traitName) ||
+      normalizeTraitName(row.id) === normalizeTraitName(traitName)
+    ));
+
+    return {
+      ...pt,
+      id: pt.id || traitName,
+      votes: match?.votes_count || match?.votes || 0,
+    } as Trait;
+  });
+
+  rows.forEach((row: any) => {
+    const rowName = row.trait_name || row.name || row.trait_id;
+    if (!rowName || mapped.some(trait => normalizeTraitName(trait.name) === normalizeTraitName(rowName))) return;
+    mapped.push({
+      id: row.id || rowName,
+      name: rowName,
+      category: 'custom',
+      votes: row.votes_count || row.votes || 0,
+      voters: [],
+    });
+  });
+
+  return mapped;
+};
+
 const askFriendshipLength = (friendName: string) => {
   const menu = FRIENDSHIP_LENGTH_OPTIONS
     .map((option, index) => `${index + 1}. ${option.label}`)
@@ -111,10 +145,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   const relationshipLength = link?.relationship_length || '';
   const friendRelationshipLength = reverseLink?.relationship_length || '';
   const isVoteEligible = isEligibleLength(relationshipLength) && isEligibleLength(friendRelationshipLength);
-  const traits = PREDEFINED_TRAITS.map(pt => ({
-    ...pt,
-    votes: profile.traits?.find((t: any) => t.trait_id === pt.id || t.trait_name === pt.name)?.votes_count || 0,
-  })) as Trait[];
+  const traits = mapSupabaseTraits(profile.traits || []);
 
   return ({
   id: profile.id,
@@ -252,7 +283,11 @@ export default function App() {
     try {
       const inviterLength = window.localStorage.getItem('vibebatch_pending_invite_length');
       const currentLength = askFriendshipLength('this friend');
-      if (!currentLength) return;
+      if (!currentLength) {
+        window.localStorage.removeItem('vibebatch_pending_invite');
+        window.localStorage.removeItem('vibebatch_pending_invite_length');
+        return;
+      }
       await acceptInvite(pendingInvite, userId, currentLength, inviterLength);
     } catch (error) {
       console.error('Failed to accept invite:', error);
@@ -289,6 +324,30 @@ export default function App() {
 
     setInviteLink(link);
     setCurrentScreen('invite');
+  };
+
+  const openFriendDetails = async (friend: Friend) => {
+    setFriendDetails(friend);
+
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*, traits(*)')
+        .eq('id', friend.id)
+        .single();
+
+      if (error || !profile) return;
+
+      setFriendDetails({
+        ...friend,
+        username: profile.username || friend.username,
+        displayName: profile.display_name || friend.displayName,
+        avatar: profile.avatar_url || friend.avatar,
+        traits: mapSupabaseTraits(profile.traits || []),
+      });
+    } catch (error) {
+      console.warn('Could not refresh friend details:', error);
+    }
   };
 
   const fetchUserProfile = async (username: string) => {
@@ -378,7 +437,6 @@ export default function App() {
           profile = createdProfile;
         }
 
-        await applyPendingInvite(user.id);
         const friends = await refreshFriends(user.id);
 
         setAuthState({
@@ -945,6 +1003,13 @@ export default function App() {
                </div>
             </div>
 
+            <div className="lg:hidden grid grid-cols-4 gap-2">
+              <StatItem label="Friends" value={user.friends.length} />
+              <StatItem label="Eligible" value={eligibleFriends.length} />
+              <StatItem label="Voted" value={votedFriends.length} />
+              <StatItem label="Locked" value={lockedFriends.length} />
+            </div>
+
             <div className="card-surface p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold font-display text-lg">Top Traits</h3>
@@ -996,7 +1061,7 @@ export default function App() {
                       <div className="flex-1">
                         <button
                           className="text-xs font-bold hover:text-accent transition-colors text-left"
-                          onClick={() => setFriendDetails(friend)}
+                          onClick={() => openFriendDetails(friend)}
                         >
                           {friend.displayName}
                         </button>
@@ -1131,7 +1196,7 @@ export default function App() {
               onAddFriend={addFriend}
               onOpenInvite={openInviteScreen}
               onUpdateFriendshipLength={updateFriendshipLength}
-              onOpenDetails={setFriendDetails}
+              onOpenDetails={openFriendDetails}
             />
           )}
 
