@@ -993,7 +993,7 @@ export default function App() {
               <Menu size={22} />
             </button>
             
-            <div className="hidden xl:flex nav-pill">
+            <div className="desktop-nav-pill hidden xl:flex nav-pill">
               <NavItem icon={<Users size={20} />} active={currentScreen === 'friends'} onClick={() => setCurrentScreen('friends')} />
               <div className="w-px h-6 bg-white/10 mx-1" />
               <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
