@@ -194,6 +194,7 @@ export default function App() {
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [friendDetails, setFriendDetails] = useState<Friend | null>(null);
   const [inviteLink, setInviteLink] = useState('');
+  const [inviteBackScreen, setInviteBackScreen] = useState('friends');
   const [loading, setLoading] = useState(false);
   const [isLoginView, setIsLoginView] = useState(false);
   const [signupAvatarFile, setSignupAvatarFile] = useState<File | null>(null);
@@ -338,11 +339,12 @@ export default function App() {
     alert('Friend invite link copied. Send it to someone you want to add.');
   };
 
-  const openInviteScreen = () => {
+  const openInviteScreen = (backScreen = 'friends') => {
     const link = inviteLink || createInviteLink();
     if (!link) return;
 
     setInviteLink(link);
+    setInviteBackScreen(backScreen);
     setCurrentScreen('invite');
   };
 
@@ -1028,7 +1030,7 @@ export default function App() {
             </div>
 
             <div className="mt-auto w-full pt-6 space-y-3">
-               <Button onClick={() => setCurrentScreen('public-profile')} variant="primary">Share Profile →</Button>
+               <Button onClick={() => openInviteScreen('home')} variant="primary">Share Profile →</Button>
                <Button onClick={() => setCurrentScreen('storycard')} variant="secondary">View Story Card</Button>
             </div>
           </section>
@@ -1260,7 +1262,7 @@ export default function App() {
           {currentScreen === 'invite' && authState.user && (
             <InviteFriendScreen
               link={inviteLink}
-              onBack={() => setCurrentScreen('friends')}
+              onBack={() => setCurrentScreen(inviteBackScreen)}
               onCopy={copyInviteLink}
             />
           )}
