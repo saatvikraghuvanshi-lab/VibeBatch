@@ -2,13 +2,13 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0B1020;
-  --color-surface: #161B33;
-  --color-primary-gradient: #FF4D6D;
-  --color-primary-gradient-end: #D03E58;
-  --color-accent: #00E5FF;
+  --color-background: #09070F;
+  --color-surface: #17101F;
+  --color-primary-gradient: #E8C8FF;
+  --color-primary-gradient-end: #6F2C91;
+  --color-accent: #E9C7FF;
   --color-text-main: #FFFFFF;
-  --color-sponsored: #FFD700;
+  --color-sponsored: #F6D38B;
   
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
@@ -32,39 +32,45 @@
   body {
     @apply bg-background text-text-main font-sans selection:bg-accent selection:text-background;
     background:
-      linear-gradient(135deg, rgba(255, 77, 109, 0.08), transparent 28%),
-      linear-gradient(180deg, #0B1020 0%, #090D1A 100%);
+      radial-gradient(circle at 50% 0%, rgba(232, 200, 255, 0.16), transparent 26rem),
+      radial-gradient(circle at 88% 18%, rgba(151, 72, 255, 0.16), transparent 22rem),
+      radial-gradient(circle at 10% 90%, rgba(119, 245, 255, 0.08), transparent 24rem),
+      linear-gradient(180deg, #09070F 0%, #050408 100%);
   }
 }
 
 .gradient-button {
-  @apply bg-gradient-to-br from-[#FF4D6D] via-[#FF6F89] to-[#B8324A] text-white font-bold py-4 px-6 rounded-lg hover:opacity-90 transition-opacity active:scale-[0.98];
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22), 0 12px 28px rgba(255, 77, 109, 0.18);
+  @apply bg-gradient-to-br from-[#F5D7FF] via-[#A875FF] to-[#4A0D63] text-white font-bold py-4 px-6 rounded-lg hover:opacity-90 transition-opacity active:scale-[0.98];
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 14px 34px rgba(168, 117, 255, 0.22), 0 0 18px rgba(245, 215, 255, 0.12);
 }
 
 .card-surface {
   @apply rounded-[var(--radius-card)] border border-white/5;
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0)),
-    #161B33;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(232, 200, 255, 0.02)),
+    linear-gradient(180deg, #1D1428 0%, #120B19 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 42px rgba(0, 0, 0, 0.22);
 }
 
 .glowing-accent {
-  box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 18px rgba(232, 200, 255, 0.46), 0 0 36px rgba(119, 245, 255, 0.12);
 }
 
 .text-gradient {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FFFFFF] via-[#FF8FA3] to-[#FF4D6D];
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FFFFFF] via-[#F2D7FF] to-[#A875FF];
 }
 
 .nav-pill {
-  @apply flex items-center gap-3 bg-surface px-4 py-2 rounded-full border border-white/5;
+  @apply flex items-center gap-3 bg-surface px-4 py-2 rounded-full border border-white/10;
   max-width: calc(100vw - 2rem);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 18px 44px rgba(83, 32, 122, 0.26);
 }
 
 .stat-item {
-  @apply bg-background p-3 rounded-lg text-center border border-white/5;
+  @apply bg-background p-3 rounded-lg text-center border border-white/10;
+  background:
+    linear-gradient(160deg, rgba(232, 200, 255, 0.055), rgba(255, 255, 255, 0)),
+    #0D0914;
 }
 
 /* Custom Scrollbar */

@@ -1256,6 +1256,7 @@ export default function App() {
               onOpenInvite={openInviteScreen}
               onUpdateFriendshipLength={updateFriendshipLength}
               onOpenDetails={openFriendDetails}
+              onVote={(friend: Friend) => { setSelectedFriend(friend); setCurrentScreen('voting'); }}
             />
           )}
 
@@ -1272,11 +1273,21 @@ export default function App() {
           )}
           
           {currentScreen === 'hourglass' && authState.user && (
-            <HourglassScreen onBack={() => setCurrentScreen('home')} user={authState.user} onUpdateFriendshipLength={updateFriendshipLength} />
+            <HourglassScreen
+              onBack={() => setCurrentScreen('home')}
+              user={authState.user}
+              onUpdateFriendshipLength={updateFriendshipLength}
+              onVote={(friend: Friend) => { setSelectedFriend(friend); setCurrentScreen('voting'); }}
+            />
           )}
           
           {currentScreen === 'tracker' && authState.user && (
-            <VoteTrackerScreen onBack={() => setCurrentScreen('home')} user={authState.user} onUpdateFriendshipLength={updateFriendshipLength} />
+            <VoteTrackerScreen
+              onBack={() => setCurrentScreen('home')}
+              user={authState.user}
+              onUpdateFriendshipLength={updateFriendshipLength}
+              onVote={(friend: Friend) => { setSelectedFriend(friend); setCurrentScreen('voting'); }}
+            />
           )}
           
           {currentScreen === 'public-profile' && selectedFriend && (
@@ -1537,7 +1548,7 @@ function InviteFriendScreen({ link, onBack, onCopy }: any) {
   );
 }
 
-function FriendsScreen({ onBack, user, onChat, onAddFriend, onOpenInvite, onUpdateFriendshipLength, onOpenDetails }: any) {
+function FriendsScreen({ onBack, user, onChat, onAddFriend, onOpenInvite, onUpdateFriendshipLength, onOpenDetails, onVote }: any) {
   const [newName, setNewName] = useState('');
 
   const submit = (e: any) => {
@@ -1613,6 +1624,19 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onOpenInvite, onUpda
               {friend.relationshipLength && !friend.isVoteEligible && (
                 <span className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-white/5 text-white/40 border border-white/10">
                   Waiting
+                </span>
+              )}
+              {friend.isVoteEligible && !friend.hasVoted && (
+                <button
+                  onClick={() => onVote(friend)}
+                  className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-accent text-background hover:scale-105 transition-transform"
+                >
+                  Vote
+                </button>
+              )}
+              {friend.hasVoted && (
+                <span className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-accent/10 text-accent border border-accent/20">
+                  Voted
                 </span>
               )}
               <button 
@@ -1727,7 +1751,7 @@ function TraitCategory({ label, traits, total, sponsored, custom }: any) {
   );
 }
 
-function HourglassScreen({ onBack, user, onUpdateFriendshipLength }: any) {
+function HourglassScreen({ onBack, user, onUpdateFriendshipLength, onVote }: any) {
   const eligible = user.friends.filter((f: Friend) => f.isVoteEligible);
   const notEligible = user.friends.filter((f: Friend) => !f.isVoteEligible);
 
@@ -1759,7 +1783,16 @@ function HourglassScreen({ onBack, user, onUpdateFriendshipLength }: any) {
                   )}
                   <span className="font-bold text-sm">{f.displayName}</span>
                 </div>
-                <Badge color={f.hasVoted ? 'green' : 'accent'}>{f.hasVoted ? 'Voted' : 'Eligible'}</Badge>
+                {f.hasVoted ? (
+                  <Badge color="green">Voted</Badge>
+                ) : (
+                  <button
+                    onClick={() => onVote(f)}
+                    className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-accent text-background hover:scale-105 transition-transform"
+                  >
+                    Vote
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -1792,7 +1825,7 @@ function HourglassScreen({ onBack, user, onUpdateFriendshipLength }: any) {
   );
 }
 
-function VoteTrackerScreen({ onBack, user, onUpdateFriendshipLength }: any) {
+function VoteTrackerScreen({ onBack, user, onUpdateFriendshipLength, onVote }: any) {
   const votedCount = user.friends.filter((f: Friend) => f.hasVoted).length;
   const votePoolCount = user.friends.filter((f: Friend) => f.isVoteEligible).length;
   const eligibleCount = user.friends.filter((f: Friend) => f.isVoteEligible && !f.hasVoted).length;
@@ -1828,7 +1861,16 @@ function VoteTrackerScreen({ onBack, user, onUpdateFriendshipLength }: any) {
                  <span className="font-bold text-sm">{friend.displayName}</span>
                </div>
                {friend.isVoteEligible ? (
-                 <Badge color={friend.hasVoted ? 'green' : 'accent'}>{friend.hasVoted ? 'Voted' : 'Eligible'}</Badge>
+                 friend.hasVoted ? (
+                   <Badge color="green">Voted</Badge>
+                 ) : (
+                   <button
+                     onClick={() => onVote(friend)}
+                     className="px-3 py-2 rounded-lg text-[9px] font-black uppercase bg-accent text-background hover:scale-105 transition-transform"
+                   >
+                     Vote
+                   </button>
+                 )
                ) : (
                  <button onClick={() => onUpdateFriendshipLength(friend)}>
                    <Badge color="amber">{friend.relationshipLength ? 'Waiting for friend' : 'Set time'}</Badge>
