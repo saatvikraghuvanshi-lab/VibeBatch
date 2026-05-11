@@ -242,6 +242,7 @@ export default function App() {
     try {
       const inviterLength = window.localStorage.getItem('vibebatch_pending_invite_length');
       const currentLength = askFriendshipLength('this friend');
+      if (!currentLength) return;
       await acceptInvite(pendingInvite, userId, currentLength, inviterLength);
     } catch (error) {
       console.error('Failed to accept invite:', error);
@@ -711,6 +712,10 @@ export default function App() {
     window.localStorage.setItem('vibebatch_pending_invite', invite);
     const known = params.get('known');
     if (known) window.localStorage.setItem('vibebatch_pending_invite_length', known);
+
+    const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+    window.history.replaceState({}, document.title, cleanUrl);
+
     if (authState.user) {
       applyPendingInvite(authState.user.id).then(async () => {
         const friends = await refreshFriends(authState.user!.id);
