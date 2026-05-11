@@ -34,6 +34,7 @@ import {
   Clock,
   Send,
   Share,
+  Menu,
 } from 'lucide-react';
 import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
 import { getStore, saveStore } from '../lib/store';
@@ -984,6 +985,13 @@ export default function App() {
             >
                {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="Profile" /> : <Sparkles className="text-accent/20" size={20} />}
             </div>
+            <button
+              onClick={() => setCurrentScreen('mobile-menu')}
+              className="xl:hidden w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-surface border border-white/10 text-white/70 hover:text-accent hover:border-accent/40 transition-colors flex items-center justify-center"
+              aria-label="Open navigation menu"
+            >
+              <Menu size={22} />
+            </button>
             
             <div className="hidden xl:flex nav-pill">
               <NavItem icon={<Users size={20} />} active={currentScreen === 'friends'} onClick={() => setCurrentScreen('friends')} />
@@ -1187,17 +1195,6 @@ export default function App() {
           </div>
           <p className="text-[11px] text-white/20 font-bold tracking-wider uppercase">© 2026 VibeBatch. All votes are anonymous.</p>
         </footer>
-
-        {/* Mobile Nav Bar */}
-        <div className="xl:hidden fixed bottom-4 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
-          <div className="nav-pill w-full max-w-sm justify-around gap-0 px-3 py-3 shadow-2xl shadow-accent/20 bg-surface/95 backdrop-blur-xl pointer-events-auto">
-            <NavItem icon={<Users size={20} />} active={currentScreen === 'friends'} onClick={() => setCurrentScreen('friends')} />
-            <div className="w-px h-6 bg-white/10 mx-1" />
-            <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
-            <NavItem icon={<Hourglass size={20} />} active={currentScreen === 'hourglass'} onClick={() => setCurrentScreen('hourglass')} />
-            <NavItem icon={<BarChart3 size={20} />} active={currentScreen === 'tracker'} onClick={() => setCurrentScreen('tracker')} />
-          </div>
-        </div>
       </div>
     );
   };
@@ -1222,6 +1219,47 @@ export default function App() {
       <p className="text-[10px] text-white/10 font-bold tracking-widest">© 2026 VIBEBATCH</p>
     </footer>
   );
+
+  const MobileMenuScreen = () => {
+    const items = [
+      { label: 'Friends', description: 'Manage friends, invite links, and chats', icon: <Users size={22} />, screen: 'friends' },
+      { label: 'Traits', description: 'View your anonymous trait breakdown', icon: <Sparkles size={22} />, screen: 'traits' },
+      { label: 'Eligibility', description: 'Check who can vote for your traits', icon: <Hourglass size={22} />, screen: 'hourglass' },
+      { label: 'Vote Tracker', description: 'Track eligible, voted, and locked friends', icon: <BarChart3 size={22} />, screen: 'tracker' },
+    ];
+
+    return (
+      <div className="min-h-screen p-4 pb-10 max-w-2xl mx-auto w-full">
+        <div className="flex items-center gap-4 mb-8">
+          <button onClick={() => setCurrentScreen('home')}><ChevronLeft /></button>
+          <div>
+            <h2 className="text-2xl font-bold font-display">Menu</h2>
+            <p className="text-xs text-accent font-bold uppercase tracking-[0.18em] mt-1">VibeBatch navigation</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {items.map(item => (
+            <button
+              key={item.screen}
+              onClick={() => setCurrentScreen(item.screen)}
+              className="w-full card-surface p-4 flex items-center gap-4 text-left hover:border-accent/40 hover:bg-accent/5 transition-colors"
+            >
+              <span className="w-12 h-12 rounded-xl bg-accent/10 text-accent border border-accent/20 flex items-center justify-center shrink-0">
+                {item.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="block font-black text-sm uppercase tracking-wider">{item.label}</span>
+                <span className="block text-xs text-white/45 mt-1 leading-relaxed">{item.description}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <Footer />
+      </div>
+    );
+  };
 // --- Sub-Screens placeholder (Voting, Friends, Traits, etc.) ---
   
   if (!authState.isAuthenticated) {
@@ -1250,6 +1288,10 @@ export default function App() {
         >
           {currentScreen === 'home' && authState.user && (
             <HomeScreen />
+          )}
+
+          {currentScreen === 'mobile-menu' && authState.user && (
+            <MobileMenuScreen />
           )}
 
           {currentScreen === 'friends' && authState.user && (
