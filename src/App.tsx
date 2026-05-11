@@ -1069,6 +1069,11 @@ export default function App() {
               <StatItem label="Locked" value={lockedFriends.length} />
             </div>
 
+            <div className="lg:hidden w-full space-y-3">
+              <Button onClick={() => openInviteScreen('home')} variant="primary">Share Profile →</Button>
+              <Button onClick={() => setCurrentScreen('storycard')} variant="secondary">View Story Card</Button>
+            </div>
+
             <div className="card-surface p-4 sm:p-6 min-w-0">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold font-display text-lg">Top Traits</h3>
