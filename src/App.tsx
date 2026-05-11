@@ -912,21 +912,21 @@ export default function App() {
     return (
       <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col px-4 py-4 pb-28 lg:p-6 bg-background overflow-x-hidden">
         {/* Header - Desktop & Mobile */}
-        <header className="flex justify-between items-start lg:items-center mb-5 lg:mb-8 max-w-7xl mx-auto w-full min-w-0">
-          <div className="min-w-0 pr-3">
-            <h1 className="text-4xl sm:text-5xl lg:text-4xl font-display font-extrabold text-white leading-none">VibeBatch</h1>
-            <p className="mt-2 max-w-[210px] sm:max-w-none text-[11px] lg:text-xs text-accent font-bold tracking-[0.18em] uppercase leading-relaxed">Your Persona through a digital lens.</p>
+        <header className="flex justify-between items-start xl:items-center mb-5 lg:mb-8 max-w-7xl mx-auto w-full min-w-0 gap-4">
+          <div className="min-w-0 flex-1 pr-2">
+            <h1 className="text-4xl sm:text-5xl lg:text-4xl font-display font-extrabold text-white leading-none truncate">VibeBatch</h1>
+            <p className="mt-2 max-w-[220px] sm:max-w-none text-[11px] lg:text-xs text-accent font-bold tracking-[0.18em] uppercase leading-relaxed">Your Persona through a digital lens.</p>
           </div>
           
           <div className="flex items-center gap-3 shrink-0">
             <div 
-              className="w-12 h-12 lg:w-12 lg:h-12 rounded-full bg-surface border-2 border-accent cursor-pointer glowing-accent overflow-hidden flex items-center justify-center"
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-surface border-2 border-accent cursor-pointer glowing-accent overflow-hidden flex items-center justify-center"
               onClick={() => setIsProfileSheetOpen(true)}
             >
                {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="Profile" /> : <Sparkles className="text-accent/20" size={20} />}
             </div>
             
-            <div className="hidden lg:flex nav-pill">
+            <div className="hidden xl:flex nav-pill">
               <NavItem icon={<Users size={20} />} active={currentScreen === 'friends'} onClick={() => setCurrentScreen('friends')} />
               <div className="w-px h-6 bg-white/10 mx-1" />
               <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
@@ -1125,7 +1125,7 @@ export default function App() {
         </footer>
 
         {/* Mobile Nav Bar */}
-        <div className="lg:hidden fixed bottom-4 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
+        <div className="xl:hidden fixed bottom-4 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
           <div className="nav-pill w-full max-w-sm justify-around gap-0 px-3 py-3 shadow-2xl shadow-accent/20 bg-surface/95 backdrop-blur-xl pointer-events-auto">
             <NavItem icon={<Users size={20} />} active={currentScreen === 'friends'} onClick={() => setCurrentScreen('friends')} />
             <div className="w-px h-6 bg-white/10 mx-1" />
