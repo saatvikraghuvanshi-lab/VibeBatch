@@ -814,6 +814,8 @@ export default function App() {
 
     const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
     const eligibleFriends = user.friends.filter(f => f.isVoteEligible);
+    const votedFriends = user.friends.filter(f => f.hasVoted);
+    const lockedFriends = user.friends.filter(f => !f.isVoteEligible);
 
     return (
       <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col p-4 lg:p-6 bg-background">
@@ -870,10 +872,10 @@ export default function App() {
             <p className="text-accent text-sm font-medium mb-6">@{user.username}</p>
 
             <div className="grid grid-cols-2 gap-3 w-full mb-8">
-              <StatItem label="Total Votes" value={user.totalVotes} />
               <StatItem label="Friends" value={user.friends.length} />
-              <StatItem label="Eligible" value={user.friends.filter(f => f.isVoteEligible).length} />
-              <StatItem label="Voted Back" value={user.totalVotes > 0 ? "92%" : "—"} />
+              <StatItem label="Eligible" value={eligibleFriends.length} />
+              <StatItem label="Voted" value={votedFriends.length} />
+              <StatItem label="Locked" value={lockedFriends.length} />
             </div>
 
             <div className="mt-auto w-full pt-6 space-y-3">
