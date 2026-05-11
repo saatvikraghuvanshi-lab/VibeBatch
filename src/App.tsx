@@ -910,23 +910,23 @@ export default function App() {
     const lockedFriends = user.friends.filter(f => !f.isVoteEligible);
 
     return (
-      <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col p-4 lg:p-6 bg-background">
+      <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col px-4 py-4 pb-28 lg:p-6 bg-background overflow-x-hidden">
         {/* Header - Desktop & Mobile */}
-        <header className="flex justify-between items-center mb-6 lg:mb-8 px-2 max-w-7xl mx-auto w-full">
-          <div>
-            <h1 className="text-3xl lg:text-4xl font-display font-extrabold text-white leading-tight">VibeBatch</h1>
-            <p className="text-[10px] lg:text-xs text-accent font-bold tracking-[0.1em] uppercase">Your Persona through a digital lens.</p>
+        <header className="flex justify-between items-start lg:items-center mb-5 lg:mb-8 max-w-7xl mx-auto w-full min-w-0">
+          <div className="min-w-0 pr-3">
+            <h1 className="text-4xl sm:text-5xl lg:text-4xl font-display font-extrabold text-white leading-none">VibeBatch</h1>
+            <p className="mt-2 max-w-[210px] sm:max-w-none text-[11px] lg:text-xs text-accent font-bold tracking-[0.18em] uppercase leading-relaxed">Your Persona through a digital lens.</p>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 shrink-0">
             <div 
-              className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-surface border-2 border-accent cursor-pointer glowing-accent overflow-hidden flex items-center justify-center"
+              className="w-12 h-12 lg:w-12 lg:h-12 rounded-full bg-surface border-2 border-accent cursor-pointer glowing-accent overflow-hidden flex items-center justify-center"
               onClick={() => setIsProfileSheetOpen(true)}
             >
                {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="Profile" /> : <Sparkles className="text-accent/20" size={20} />}
             </div>
             
-            <div className="hidden md:flex nav-pill">
+            <div className="hidden lg:flex nav-pill">
               <NavItem icon={<Users size={20} />} active={currentScreen === 'friends'} onClick={() => setCurrentScreen('friends')} />
               <div className="w-px h-6 bg-white/10 mx-1" />
               <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
@@ -937,7 +937,7 @@ export default function App() {
         </header>
 
         {/* Main Content Grid */}
-        <main className="flex-1 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-[320px_1fr_300px] gap-6 overflow-hidden min-h-0">
+        <main className="flex-1 max-w-7xl mx-auto w-full min-w-0 grid grid-cols-1 lg:grid-cols-[320px_1fr_300px] gap-6 lg:overflow-hidden min-h-0">
           
           {/* Left Sidebar - Profile Summary */}
           <section className="hidden lg:flex card-surface p-6 flex-col items-center overflow-y-auto">
@@ -977,7 +977,7 @@ export default function App() {
           </section>
 
           {/* Center Column - Main Dashboard Feed */}
-          <section className="flex flex-col gap-6 overflow-y-auto pr-1">
+          <section className="flex flex-col gap-5 lg:gap-6 lg:overflow-y-auto lg:pr-1 min-w-0">
             <div className="lg:hidden flex flex-col items-center py-4 space-y-4">
                 <div className="relative">
                   {user.avatar ? (
@@ -1003,20 +1003,20 @@ export default function App() {
                </div>
             </div>
 
-            <div className="lg:hidden grid grid-cols-4 gap-2">
+            <div className="lg:hidden grid grid-cols-4 gap-2 w-full min-w-0">
               <StatItem label="Friends" value={user.friends.length} />
               <StatItem label="Eligible" value={eligibleFriends.length} />
               <StatItem label="Voted" value={votedFriends.length} />
               <StatItem label="Locked" value={lockedFriends.length} />
             </div>
 
-            <div className="card-surface p-6">
+            <div className="card-surface p-4 sm:p-6 min-w-0">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold font-display text-lg">Top Traits</h3>
                 <span className="text-[10px] text-white/40 flex items-center gap-1.5 font-bold uppercase tracking-widest"><EyeOff size={14} /> Anonymous</span>
               </div>
               
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-3 sm:gap-4">
                 {user.totalVotes > 0 ? topTraits.map((trait, i) => (
                   <div key={trait.id} className="stat-item border-accent/20">
                     <span className="text-2xl block mb-2">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
@@ -1034,7 +1034,7 @@ export default function App() {
               </div>
             </div>
 
-            <div className="card-surface p-6 flex-1 min-h-0 flex flex-col">
+            <div className="card-surface p-4 sm:p-6 flex-1 min-h-0 flex flex-col min-w-0">
                <h3 className="text-[10px] text-accent font-bold uppercase tracking-[0.2em] mb-6">Trait Breakdown</h3>
                <div className="space-y-5 overflow-y-auto pr-2 custom-scrollbar">
                   {user.traits.sort((a,b) => b.votes - a.votes).slice(0, 8).map(trait => (
@@ -1125,10 +1125,10 @@ export default function App() {
         </footer>
 
         {/* Mobile Nav Bar */}
-        <div className="md:hidden fixed bottom-6 left-4 right-4 z-40 flex justify-center">
-          <div className="nav-pill px-6 py-3 shadow-2xl shadow-accent/20 bg-surface/90 backdrop-blur-xl">
+        <div className="lg:hidden fixed bottom-4 left-0 right-0 z-40 flex justify-center px-4 pointer-events-none">
+          <div className="nav-pill w-full max-w-sm justify-around gap-0 px-3 py-3 shadow-2xl shadow-accent/20 bg-surface/95 backdrop-blur-xl pointer-events-auto">
             <NavItem icon={<Users size={20} />} active={currentScreen === 'friends'} onClick={() => setCurrentScreen('friends')} />
-            <div className="w-px h-6 bg-white/10 mx-2" />
+            <div className="w-px h-6 bg-white/10 mx-1" />
             <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
             <NavItem icon={<Hourglass size={20} />} active={currentScreen === 'hourglass'} onClick={() => setCurrentScreen('hourglass')} />
             <NavItem icon={<BarChart3 size={20} />} active={currentScreen === 'tracker'} onClick={() => setCurrentScreen('tracker')} />
@@ -1141,7 +1141,7 @@ export default function App() {
   const NavItem = ({ icon, active, onClick }: any) => (
     <button 
       onClick={onClick}
-      className={`p-2 rounded-lg transition-all ${active ? 'text-accent bg-accent/10 glowing-accent' : 'text-white/40 hover:text-white'}`}
+      className={`p-2.5 rounded-lg transition-all shrink-0 ${active ? 'text-accent bg-accent/10 glowing-accent' : 'text-white/40 hover:text-white'}`}
     >
       {icon}
     </button>
@@ -1633,7 +1633,7 @@ function TraitCategory({ label, traits, total, sponsored, custom }: any) {
       <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30 px-1 border-l-2 border-accent/20 ml-1">{label}</h3>
       <div className="space-y-4">
         {traits.map((t: Trait) => {
-          const percent = Math.round((t.votes / total) * 100);
+          const percent = Math.round(((t.votes || 0) / Math.max(total || 0, 1)) * 100) || 0;
           return (
             <div key={t.id} className="space-y-2">
               <div className="flex justify-between items-center text-xs font-bold px-1">
