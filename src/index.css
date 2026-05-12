@@ -73,6 +73,12 @@
     #0D0914;
 }
 
+@media (max-width: 1279px), (pointer: coarse) {
+  .desktop-nav-pill {
+    display: none !important;
+  }
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
