@@ -194,6 +194,7 @@ export default function App() {
   const [isProfileSheetOpen, setIsProfileSheetOpen] = useState(false);
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null);
   const [friendDetails, setFriendDetails] = useState<Friend | null>(null);
+  const [votingBackScreen, setVotingBackScreen] = useState('home');
   const [inviteLink, setInviteLink] = useState('');
   const [inviteBackScreen, setInviteBackScreen] = useState('friends');
   const [loading, setLoading] = useState(false);
@@ -371,6 +372,12 @@ export default function App() {
     } catch (error) {
       console.warn('Could not refresh friend details:', error);
     }
+  };
+
+  const openVotingScreen = (friend: Friend, backScreen: string) => {
+    setSelectedFriend(friend);
+    setVotingBackScreen(backScreen);
+    setCurrentScreen('voting');
   };
 
   const loadCurrentUserProfile = async (userId: string) => {
@@ -1303,7 +1310,7 @@ export default function App() {
               onOpenInvite={openInviteScreen}
               onUpdateFriendshipLength={updateFriendshipLength}
               onOpenDetails={openFriendDetails}
-              onVote={(friend: Friend) => { setSelectedFriend(friend); setCurrentScreen('voting'); }}
+              onVote={(friend: Friend) => openVotingScreen(friend, 'friends')}
             />
           )}
 
@@ -1324,7 +1331,7 @@ export default function App() {
               onBack={() => setCurrentScreen('home')}
               user={authState.user}
               onUpdateFriendshipLength={updateFriendshipLength}
-              onVote={(friend: Friend) => { setSelectedFriend(friend); setCurrentScreen('voting'); }}
+              onVote={(friend: Friend) => openVotingScreen(friend, 'hourglass')}
             />
           )}
           
@@ -1333,7 +1340,7 @@ export default function App() {
               onBack={() => setCurrentScreen('home')}
               user={authState.user}
               onUpdateFriendshipLength={updateFriendshipLength}
-              onVote={(friend: Friend) => { setSelectedFriend(friend); setCurrentScreen('voting'); }}
+              onVote={(friend: Friend) => openVotingScreen(friend, 'tracker')}
             />
           )}
           
@@ -1367,7 +1374,7 @@ export default function App() {
           {currentScreen === 'voting' && selectedFriend && authState.user && (
             <VotingScreen 
               friend={selectedFriend} 
-              onBack={() => setCurrentScreen('public-profile')} 
+              onBack={() => setCurrentScreen(votingBackScreen)} 
               onVote={async (traits: string[]) => {
                 if (selectedFriend && authState.user) {
                   setLoading(true);
@@ -2278,6 +2285,8 @@ const TraitRow = ({ trait, total }: any) => {
 
 function PublicProfileScreen({ user, onBack, onVote }: any) {
   const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
+  const friendsCount = Array.isArray(user.friends) ? user.friends.length : 0;
+
   return (
     <div className="min-h-screen bg-background p-4 flex flex-col items-center">
       <div className="w-full flex justify-start mb-4">
@@ -2314,7 +2323,7 @@ function PublicProfileScreen({ user, onBack, onVote }: any) {
            </div>
            <div className="w-px h-8 bg-white/5" />
            <div className="text-center">
-             <p className="text-xl font-bold font-display">{user.friends.length}</p>
+             <p className="text-xl font-bold font-display">{friendsCount}</p>
              <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Friends</p>
            </div>
         </div>
@@ -2334,6 +2343,7 @@ function PublicProfileScreen({ user, onBack, onVote }: any) {
 
 function StoryCardGeneratorScreen({ user, onBack }: any) {
   const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
+  const hasVotes = Number(user.totalVotes || 0) > 0;
 
   const downloadStoryCard = async () => {
     const canvas = document.createElement('canvas');
@@ -2342,25 +2352,41 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.fillStyle = '#0B1020';
+    const background = '#09070F';
+    const accent = '#E9C7FF';
+    const violet = '#A875FF';
+    const textMuted = 'rgba(255,255,255,0.48)';
+
+    ctx.fillStyle = background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-    gradient.addColorStop(0, 'rgba(0,229,255,0.28)');
-    gradient.addColorStop(1, 'rgba(11,16,32,0)');
+    const gradient = ctx.createRadialGradient(540, 0, 80, 540, 0, 820);
+    gradient.addColorStop(0, 'rgba(232,200,255,0.24)');
+    gradient.addColorStop(0.55, 'rgba(168,117,255,0.12)');
+    gradient.addColorStop(1, 'rgba(9,7,15,0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '700 72px Arial';
+    ctx.font = '700 72px Inter, Arial';
     ctx.fillText(user.displayName || 'Your Name', canvas.width / 2, 680);
 
-    ctx.fillStyle = '#00E5FF';
-    ctx.font = '900 38px Arial';
-    ctx.fillText(user.identityTitle || 'IDENTITY LOCKED', canvas.width / 2, 760);
+    const title = user.identityTitle || 'IDENTITY LOCKED';
+    ctx.font = '900 24px Inter, Arial';
+    const titleWidth = Math.min(ctx.measureText(title).width + 100, 520);
+    const titleX = canvas.width / 2 - titleWidth / 2;
+    const titleGradient = ctx.createLinearGradient(titleX, 724, titleX + titleWidth, 784);
+    titleGradient.addColorStop(0, '#F5D7FF');
+    titleGradient.addColorStop(1, '#A875FF');
+    ctx.fillStyle = titleGradient;
+    ctx.beginPath();
+    ctx.roundRect(titleX, 718, titleWidth, 62, 31);
+    ctx.fill();
+    ctx.fillStyle = '#09070F';
+    ctx.fillText(title.toUpperCase(), canvas.width / 2, 758, titleWidth - 56);
 
-    ctx.strokeStyle = '#00E5FF';
+    ctx.strokeStyle = accent;
     ctx.lineWidth = 12;
     ctx.beginPath();
     ctx.arc(canvas.width / 2, 430, 150, 0, Math.PI * 2);
@@ -2389,24 +2415,47 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       }
     }
 
-    topTraits.forEach((trait, index) => {
+    if (hasVotes) topTraits.forEach((trait, index) => {
       const x = 160 + index * 260;
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillStyle = index === 0 ? 'rgba(232,200,255,0.14)' : 'rgba(255,255,255,0.06)';
       ctx.roundRect(x, 900, 220, 140, 28);
       ctx.fill();
-      ctx.fillStyle = '#00E5FF';
-      ctx.font = '900 34px Arial';
+      ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = accent;
+      ctx.font = '900 30px Inter, Arial';
       ctx.fillText(`#${index + 1}`, x + 110, 950);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '700 28px Arial';
+      ctx.font = '700 24px Inter, Arial';
       ctx.fillText(trait.name || 'Trait', x + 110, 1008, 180);
     });
 
-    ctx.fillStyle = '#00E5FF';
-    ctx.font = '900 76px Arial';
+    if (!hasVotes) [0, 1, 2].forEach((index) => {
+      const x = 160 + index * 260;
+      ctx.fillStyle = 'rgba(255,255,255,0.035)';
+      ctx.roundRect(x, 900, 220, 140, 28);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.16)';
+      ctx.font = '900 22px Inter, Arial';
+      ctx.fillText(`#${index + 1}`, x + 110, 950);
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.roundRect(x + 34, 982, 152, 10, 5);
+      ctx.fill();
+    });
+
+    const brandGradient = ctx.createLinearGradient(360, 0, 720, 0);
+    brandGradient.addColorStop(0, '#FFFFFF');
+    brandGradient.addColorStop(0.55, '#F2D7FF');
+    brandGradient.addColorStop(1, violet);
+    ctx.fillStyle = brandGradient;
+    ctx.font = '900 76px Inter, Arial';
     ctx.fillText('VibeBatch', canvas.width / 2, 1640);
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = '700 24px Arial';
+    ctx.fillStyle = textMuted;
+    ctx.font = '700 24px Inter, Arial';
     ctx.fillText('YOUR FRIENDS KNOW YOU BEST', canvas.width / 2, 1700);
 
     const link = document.createElement('a');
@@ -2449,7 +2498,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
              </div>
              
              <div className="flex gap-2 w-full justify-center">
-               {user.totalVotes > 0 ? topTraits.map((t, i) => (
+               {hasVotes ? topTraits.map((t, i) => (
                  <div key={t.id} className="bg-surface/50 backdrop-blur-md border border-white/10 rounded-xl p-3 flex flex-col items-center gap-1 flex-1 min-w-0">
                     <span className="text-[10px] font-black text-accent uppercase tracking-tighter truncate w-full text-center">#{i+1}</span>
                     <span className="text-[10px] font-bold text-white truncate w-full text-center">{t.name}</span>
