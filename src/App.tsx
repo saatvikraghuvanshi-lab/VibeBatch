@@ -981,20 +981,22 @@ export default function App() {
         {/* Header - Desktop & Mobile */}
         <header className="flex justify-between items-start xl:items-center mb-5 lg:mb-8 max-w-7xl mx-auto w-full min-w-0 gap-4">
           <div className="min-w-0 flex-1 pr-2">
-            <h1 className="text-4xl sm:text-5xl lg:text-4xl font-display font-extrabold text-white leading-none truncate">VibeBatch</h1>
-            <p className="mt-2 max-w-[220px] sm:max-w-none text-[11px] lg:text-xs text-accent font-bold tracking-[0.18em] uppercase leading-relaxed">Your Persona through a digital lens.</p>
+            <h1 className="text-4xl sm:text-5xl lg:text-4xl font-display font-extrabold text-gradient leading-none truncate">VibeBatch</h1>
+            <p className="mt-2 max-w-[220px] sm:max-w-none text-[11px] lg:text-xs text-accent font-bold tracking-[0.18em] uppercase leading-relaxed">Your persona in chrome, glow, and receipts.</p>
           </div>
           
           <div className="flex items-center gap-3 shrink-0">
             <div 
-              className="w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-surface border-2 border-accent cursor-pointer glowing-accent overflow-hidden flex items-center justify-center"
+              className="shimmer-ring w-11 h-11 sm:w-12 sm:h-12 rounded-full cursor-pointer overflow-hidden flex items-center justify-center"
               onClick={() => setIsProfileSheetOpen(true)}
             >
-               {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="Profile" /> : <Sparkles className="text-accent/20" size={20} />}
+               <div className="w-full h-full rounded-full overflow-hidden bg-surface flex items-center justify-center">
+                 {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="Profile" /> : <Sparkles className="text-accent/40" size={20} />}
+               </div>
             </div>
             <button
               onClick={() => setCurrentScreen('mobile-menu')}
-              className="xl:hidden w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-surface border border-white/10 text-white/70 hover:text-accent hover:border-accent/40 transition-colors flex items-center justify-center"
+              className="xl:hidden w-11 h-11 sm:w-12 sm:h-12 rounded-full metallic-panel text-white/80 hover:text-accent hover:border-accent/40 transition-colors flex items-center justify-center"
               aria-label="Open navigation menu"
             >
               <Menu size={22} />
@@ -1016,12 +1018,14 @@ export default function App() {
           {/* Left Sidebar - Profile Summary */}
           <section className="hidden lg:flex card-surface p-6 flex-col items-center overflow-y-auto">
             <div className="relative mb-6">
-              <div className="w-32 h-32 rounded-full border-4 border-accent overflow-hidden flex items-center justify-center bg-surface">
-                {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="" /> : <Sparkles className="text-accent/20" size={48} />}
+              <div className="shimmer-ring w-32 h-32 rounded-full overflow-hidden flex items-center justify-center">
+                <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-surface">
+                  {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="" /> : <Sparkles className="text-accent/30" size={48} />}
+                </div>
               </div>
               {user.identityTitle ? (
                 <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
-                   <div className="px-5 py-2 text-[10px] whitespace-nowrap bg-accent text-background font-black rounded-full shadow-[0_0_25px_rgba(0,229,255,0.6)] uppercase tracking-wider">
+                   <div className="px-5 py-2 text-[10px] whitespace-nowrap gradient-button text-white font-black rounded-full uppercase tracking-wider">
                      {user.identityTitle}
                    </div>
                 </div>
@@ -1055,14 +1059,16 @@ export default function App() {
             <div className="lg:hidden flex flex-col items-center py-4 space-y-4">
                 <div className="relative">
                   {user.avatar ? (
-                    <img src={user.avatar} className="w-24 h-24 rounded-full border-4 border-accent glowing-accent object-cover" alt="" />
+                    <span className="shimmer-ring block w-24 h-24 rounded-full overflow-hidden">
+                      <img src={user.avatar} className="w-full h-full rounded-full object-cover" alt="" />
+                    </span>
                   ) : (
-                    <div className="w-24 h-24 rounded-full border-4 border-white/10 bg-surface flex items-center justify-center text-white/20">
+                    <div className="metallic-orb w-24 h-24 rounded-full flex items-center justify-center text-white">
                       <Sparkles size={32} />
                     </div>
                   )}
                   {user.identityTitle ? (
-                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap bg-accent text-background text-[9px] font-black px-4 py-1.5 shadow-[0_0_20px_rgba(0,229,255,0.6)] rounded-full uppercase tracking-wider">
+                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap gradient-button text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-wider">
                       {user.identityTitle}
                     </div>
                   ) : (
@@ -1091,7 +1097,7 @@ export default function App() {
 
             <div className="card-surface p-4 sm:p-6 min-w-0">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold font-display text-lg">Top Traits</h3>
+                <h3 className="font-bold font-display text-lg text-gradient">Top Traits</h3>
                 <span className="text-[10px] text-white/40 flex items-center gap-1.5 font-bold uppercase tracking-widest"><EyeOff size={14} /> Anonymous</span>
               </div>
               
@@ -1129,7 +1135,7 @@ export default function App() {
                <h3 className="text-[10px] text-accent font-bold uppercase tracking-[0.2em] mb-6">Friend Activity</h3>
                <div className="space-y-3 overflow-y-auto">
                   {user.friends.length > 0 ? user.friends.map(friend => (
-                    <div key={friend.id} className="flex items-center gap-3 bg-background/50 p-3 rounded-xl border border-white/5">
+                    <div key={friend.id} className="flex items-center gap-3 metallic-panel p-3 rounded-xl">
                       {friend.avatar ? (
                         <img src={friend.avatar} className="w-10 h-10 rounded-full bg-surface object-cover" alt="" />
                       ) : (
@@ -1160,7 +1166,7 @@ export default function App() {
                       ) : (
                         <button 
                           className="bg-accent text-background px-3 py-1 rounded-md text-[9px] font-black hover:scale-105 transition-transform"
-                          onClick={() => { setSelectedFriend(friend); setCurrentScreen('voting'); }}
+                          onClick={() => openVotingScreen(friend, 'home')}
                         >VOTE</button>
                       )}
                     </div>
@@ -1173,11 +1179,13 @@ export default function App() {
                </div>
             </div>
 
-            <div className="bg-gradient-to-b from-surface to-background border border-white/10 rounded-2xl p-6 text-center space-y-6">
+            <div className="metallic-panel rounded-2xl p-6 text-center space-y-6">
                <p className="text-[10px] uppercase font-bold tracking-widest opacity-50">Share Story Card</p>
                <div className="card-surface p-6 border-white/5 flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-full border-2 border-accent mb-3 overflow-hidden flex items-center justify-center bg-surface">
-                    {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="" /> : <Sparkles className="text-accent/20" size={24} />}
+                  <div className="shimmer-ring w-12 h-12 rounded-full mb-3 overflow-hidden flex items-center justify-center">
+                    <div className="w-full h-full rounded-full overflow-hidden bg-surface flex items-center justify-center">
+                      {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="" /> : <Sparkles className="text-accent/30" size={24} />}
+                    </div>
                   </div>
                   <p className="text-[10px] font-black uppercase text-accent truncate w-full text-center">
                     {user.identityTitle || "Identity Locked"}
@@ -1185,7 +1193,7 @@ export default function App() {
                </div>
                <button 
                 onClick={() => setCurrentScreen('storycard')}
-                className="w-full bg-white text-background py-3 rounded-lg text-xs font-black tracking-widest hover:bg-white/90 transition-colors uppercase"
+                className="gradient-button w-full py-3 rounded-lg text-xs font-black tracking-widest uppercase"
                >
                 Download (Free)
                </button>
