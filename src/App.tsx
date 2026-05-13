@@ -159,6 +159,10 @@ const mergeStableUserState = (freshUser: UserProfile, previousUser?: UserProfile
   };
 };
 
+const hasRecordedTraitVotes = (profile?: { traits?: Trait[]; totalVotes?: number } | null) => (
+  getTraitVoteTotal(profile?.traits || [], profile?.totalVotes || 0) > 0
+);
+
 const mapSupabaseTraits = (rows: any[] = []) => {
   const mapped = PREDEFINED_TRAITS.map(pt => {
     const traitName = pt.name || '';
@@ -213,7 +217,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   displayName: profile.display_name || profile.username || 'New friend',
   avatar: profile.avatar_url || '',
   friendshipDate: link?.created_at || new Date().toISOString(),
-  hasVoted: Boolean(link?.has_voted),
+  hasVoted: Boolean(link?.has_voted) && hasRecordedTraitVotes({ traits, totalVotes }),
   relationshipLength,
   friendRelationshipLength,
   isVoteEligible,
@@ -297,6 +301,68 @@ export default function App() {
     }
 
     return new Map<string, any[]>();
+  };
+
+  const incrementTraitDirectly = async (targetUserId: string, traitName: string) => {
+    const candidateOwnerColumns = ['user_id', 'profile_id', 'target_user_id'];
+    const candidateVoteColumns = ['votes_count', 'votes'];
+    const candidateTraitColumns = ['trait_name', 'name', 'trait_id'];
+
+    for (const ownerColumn of candidateOwnerColumns) {
+      for (const voteColumn of candidateVoteColumns) {
+        for (const traitColumn of candidateTraitColumns) {
+          const { data: existingRows, error: readError } = await supabase
+            .from('traits')
+            .select('*')
+            .eq(ownerColumn, targetUserId)
+            .eq(traitColumn, traitName)
+            .limit(1);
+
+          if (readError) continue;
+
+          const existing = existingRows?.[0];
+          if (existing?.id) {
+            const { error: updateError } = await supabase
+              .from('traits')
+              .update({ [voteColumn]: Number(existing[voteColumn] || 0) + 1 })
+              .eq('id', existing.id);
+
+            if (!updateError) return;
+            continue;
+          }
+
+          const { error: insertError } = await supabase
+            .from('traits')
+            .insert([{
+              [ownerColumn]: targetUserId,
+              [traitColumn]: traitName,
+              [voteColumn]: 1,
+            }]);
+
+          if (!insertError) return;
+        }
+      }
+    }
+
+    throw new Error('Trait vote could not be recorded. Please try again.');
+  };
+
+  const submitTraitVotes = async (targetUserId: string, traitNames: string[]) => {
+    const rpcResults = await Promise.all(traitNames.map(traitName =>
+      supabase.rpc('increment_trait_vote', {
+        target_user_id: targetUserId,
+        trait_name: traitName,
+      })
+    ));
+
+    const rpcErrors = rpcResults
+      .map(result => result.error)
+      .filter(Boolean);
+
+    if (rpcErrors.length === 0) return;
+
+    console.warn('Trait vote RPC failed, trying direct trait write:', rpcErrors);
+    await Promise.all(traitNames.map(traitName => incrementTraitDirectly(targetUserId, traitName)));
   };
 
   const refreshFriends = async (userId: string) => {
@@ -1497,12 +1563,14 @@ export default function App() {
                 if (selectedFriend && authState.user) {
                   setLoading(true);
                   try {
-                    await Promise.all(traits.map(traitId => 
-                      supabase.rpc('increment_trait_vote', { 
-                        target_user_id: selectedFriend.id, 
-                        trait_name: traitId 
-                      })
-                    ));
+                    await submitTraitVotes(selectedFriend.id, traits);
+
+                    const targetTraitMap = await loadTraitsForProfileIds([selectedFriend.id]);
+                    const targetProfileTraits = targetTraitMap.get(selectedFriend.id) || [];
+                    const targetMappedTraits = mapSupabaseTraits(targetProfileTraits);
+                    if (!hasRecordedTraitVotes({ traits: targetMappedTraits })) {
+                      throw new Error('Trait vote was not saved. Please try again.');
+                    }
 
                     const { error: voteStateError } = await supabase
                       .from('friendships')
