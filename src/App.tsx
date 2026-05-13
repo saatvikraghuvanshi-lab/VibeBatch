@@ -2896,19 +2896,27 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const background = '#09070F';
-    const accent = '#E9C7FF';
-    const violet = '#A875FF';
-    const textMuted = 'rgba(255,255,255,0.48)';
+    const background = '#1E1231';
+    const surface = '#2B1A3D';
+    const accent = '#DCC7FF';
+    const pink = '#E989D0';
+    const violet = '#7463D8';
+    const textMuted = 'rgba(255,255,255,0.52)';
 
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const gradient = ctx.createRadialGradient(540, 0, 80, 540, 0, 820);
-    gradient.addColorStop(0, 'rgba(232,200,255,0.24)');
-    gradient.addColorStop(0.55, 'rgba(168,117,255,0.12)');
-    gradient.addColorStop(1, 'rgba(9,7,15,0)');
+    const gradient = ctx.createRadialGradient(540, 0, 80, 540, 0, 1100);
+    gradient.addColorStop(0, 'rgba(233,137,208,0.32)');
+    gradient.addColorStop(0.46, 'rgba(220,199,255,0.20)');
+    gradient.addColorStop(1, 'rgba(30,18,49,0)');
     ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const lowerGlow = ctx.createRadialGradient(900, 1680, 40, 900, 1680, 720);
+    lowerGlow.addColorStop(0, 'rgba(116,99,216,0.22)');
+    lowerGlow.addColorStop(1, 'rgba(30,18,49,0)');
+    ctx.fillStyle = lowerGlow;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     ctx.textAlign = 'center';
@@ -2922,12 +2930,13 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     const titleX = canvas.width / 2 - titleWidth / 2;
     const titleGradient = ctx.createLinearGradient(titleX, 724, titleX + titleWidth, 784);
     titleGradient.addColorStop(0, '#F5D7FF');
-    titleGradient.addColorStop(1, '#A875FF');
+    titleGradient.addColorStop(0.52, '#DCC7FF');
+    titleGradient.addColorStop(1, '#E989D0');
     ctx.fillStyle = titleGradient;
     ctx.beginPath();
     ctx.roundRect(titleX, 718, titleWidth, 62, 31);
     ctx.fill();
-    ctx.fillStyle = '#09070F';
+    ctx.fillStyle = '#1E1231';
     ctx.fillText(title.toUpperCase(), canvas.width / 2, 758, titleWidth - 56);
 
     ctx.strokeStyle = accent;
@@ -2960,43 +2969,50 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     }
 
     if (hasVotes) topTraits.forEach((trait, index) => {
-      const x = 160 + index * 260;
-      ctx.fillStyle = index === 0 ? 'rgba(232,200,255,0.14)' : 'rgba(255,255,255,0.06)';
-      ctx.roundRect(x, 900, 220, 140, 28);
+      const y = 890 + index * 154;
+      const percent = Math.round(((trait.votes || 0) / Math.max(effectiveTotalVotes, 1)) * 100);
+      const traitGradient = ctx.createLinearGradient(170, y, 910, y + 124);
+      traitGradient.addColorStop(0, index === 0 ? 'rgba(233,137,208,0.22)' : 'rgba(220,199,255,0.13)');
+      traitGradient.addColorStop(1, 'rgba(43,26,61,0.76)');
+      ctx.fillStyle = traitGradient;
+      ctx.roundRect(150, y, 780, 124, 28);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+      ctx.strokeStyle = 'rgba(220,199,255,0.24)';
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.fillStyle = accent;
-      ctx.font = '900 30px Inter, Arial';
-      ctx.fillText(`#${index + 1}`, x + 110, 950);
+      ctx.font = '900 28px Inter, Arial';
+      ctx.textAlign = 'left';
+      ctx.fillText(`#${index + 1}`, 206, y + 74);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '700 24px Inter, Arial';
-      ctx.fillText(trait.name || 'Trait', x + 110, 1008, 180);
-      ctx.fillStyle = 'rgba(235,199,255,0.82)';
-      ctx.font = '900 22px Inter, Arial';
-      ctx.fillText(`${Math.round(((trait.votes || 0) / Math.max(effectiveTotalVotes, 1)) * 100)}%`, x + 110, 1042);
+      ctx.font = '800 34px Inter, Arial';
+      ctx.fillText(trait.name || 'Trait', 300, y + 76, 430);
+      ctx.fillStyle = '#F5D7FF';
+      ctx.font = '900 36px Inter, Arial';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${percent}%`, 862, y + 76);
+      ctx.textAlign = 'center';
     });
 
     if (!hasVotes) [0, 1, 2].forEach((index) => {
-      const x = 160 + index * 260;
-      ctx.fillStyle = 'rgba(255,255,255,0.035)';
-      ctx.roundRect(x, 900, 220, 140, 28);
+      const y = 890 + index * 154;
+      ctx.fillStyle = 'rgba(220,199,255,0.08)';
+      ctx.roundRect(150, y, 780, 124, 28);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.strokeStyle = 'rgba(220,199,255,0.16)';
       ctx.lineWidth = 2;
       ctx.stroke();
-      ctx.fillStyle = 'rgba(255,255,255,0.16)';
-      ctx.font = '900 22px Inter, Arial';
-      ctx.fillText(`#${index + 1}`, x + 110, 950);
-      ctx.fillStyle = 'rgba(255,255,255,0.08)';
-      ctx.roundRect(x + 34, 982, 152, 10, 5);
+      ctx.fillStyle = 'rgba(220,199,255,0.22)';
+      ctx.font = '900 28px Inter, Arial';
+      ctx.fillText(`#${index + 1}`, 230, y + 74);
+      ctx.fillStyle = 'rgba(255,255,255,0.10)';
+      ctx.roundRect(320, y + 58, 360, 12, 6);
       ctx.fill();
     });
 
     const brandGradient = ctx.createLinearGradient(360, 0, 720, 0);
     brandGradient.addColorStop(0, '#FFFFFF');
-    brandGradient.addColorStop(0.55, '#F2D7FF');
+    brandGradient.addColorStop(0.55, '#F5F1FA');
     brandGradient.addColorStop(1, violet);
     ctx.fillStyle = brandGradient;
     ctx.font = '900 76px Inter, Arial';
@@ -3020,8 +3036,8 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
 
       <div className="flex-1 flex flex-col items-center justify-center">
         {/* Story Card Preview */}
-        <div id="story-card" className="w-[340px] aspect-[9/16] bg-[#0B1020] rounded-[32px] overflow-hidden border border-white/10 relative p-6 flex flex-col items-center justify-between shadow-2xl">
-           <div className="absolute inset-0 bg-gradient-to-br from-accent/10 to-transparent pointer-none" />
+        <div id="story-card" className="w-[340px] aspect-[9/16] bg-background rounded-[32px] overflow-hidden border border-accent/25 relative p-6 flex flex-col items-center justify-between shadow-2xl shadow-black/30">
+           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(233,137,208,0.26),transparent_42%),radial-gradient(circle_at_95%_85%,rgba(116,99,216,0.22),transparent_38%),linear-gradient(180deg,#2A183C_0%,#1E1231_55%,#160B25_100%)] pointer-events-none" />
            
            <div className="mt-16 flex flex-col items-center space-y-8 relative z-10 w-full">
              {user.avatar ? (
@@ -3034,7 +3050,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
              <div className="text-center space-y-3">
                <h3 className="text-2xl font-bold font-display tracking-tight">{user.displayName || "Your Name"}</h3>
                {user.identityTitle ? (
-                 <div className="inline-block bg-accent text-background px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.1em] shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+                 <div className="inline-block gradient-button !py-1.5 !px-4 text-[9px] font-black uppercase tracking-[0.1em]">
                    {user.identityTitle}
                  </div>
                ) : (
@@ -3044,18 +3060,18 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
                )}
              </div>
              
-             <div className="flex gap-2 w-full justify-center">
+             <div className="flex flex-col gap-2 w-full">
                {hasVotes ? topTraits.map((t, i) => (
-                 <div key={t.id} className="bg-surface/50 backdrop-blur-md border border-white/10 rounded-xl p-3 flex flex-col items-center gap-1 flex-1 min-w-0">
-                    <span className="text-[10px] font-black text-accent uppercase tracking-tighter truncate w-full text-center">#{i+1}</span>
-                    <span className="text-[10px] font-bold text-white truncate w-full text-center">{t.name}</span>
-                    <span className="text-[9px] font-black text-accent/80">{Math.round(((t.votes || 0) / Math.max(effectiveTotalVotes, 1)) * 100)}%</span>
+                 <div key={t.id} className="bg-surface/70 backdrop-blur-md border border-accent/25 rounded-xl p-3 flex items-center gap-3 min-w-0 shadow-lg shadow-black/10">
+                    <span className="text-[10px] font-black text-accent uppercase tracking-tighter w-8 shrink-0">#{i+1}</span>
+                    <span className="text-[11px] font-bold text-white truncate flex-1">{t.name}</span>
+                    <span className="text-[11px] font-black text-accent">{Math.round(((t.votes || 0) / Math.max(effectiveTotalVotes, 1)) * 100)}%</span>
                  </div>
                )) : (
                  [1,2,3].map(i => (
-                    <div key={i} className="bg-surface/30 border border-white/10 rounded-xl p-3 flex flex-col items-center gap-2 flex-1 min-w-0 opacity-40">
-                       <span className="text-[9px] font-black text-white/20 uppercase tracking-tighter">#{i}</span>
-                       <div className="w-full h-1 bg-white/10 rounded-full" />
+                    <div key={i} className="bg-surface/40 border border-accent/15 rounded-xl p-3 flex items-center gap-3 opacity-50">
+                       <span className="text-[9px] font-black text-accent uppercase tracking-tighter w-8">#{i}</span>
+                       <div className="h-1.5 bg-white/10 rounded-full flex-1" />
                     </div>
                  ))
                )}
