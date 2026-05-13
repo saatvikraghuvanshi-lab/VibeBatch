@@ -73,10 +73,10 @@ const Card = ({ children, className = "", id }: any) => (
 
 const Badge = ({ children, color = "accent", className = "" }: any) => {
   const colors: any = {
-    accent: "bg-accent/10 text-accent border border-accent/30",
-    green: "bg-green-500/10 text-green-500 border border-green-500/30",
-    amber: "bg-amber-500/10 text-amber-500 border border-amber-500/30",
-    pink: "bg-pink-500/10 text-pink-500 border border-pink-500/30",
+    accent: "metallic-badge",
+    green: "metallic-badge",
+    amber: "metallic-badge",
+    pink: "metallic-badge",
   };
   return (
     <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${colors[color]} ${className}`}>

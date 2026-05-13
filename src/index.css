@@ -2,11 +2,11 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #160D20;
-  --color-surface: #17101F;
-  --color-primary-gradient: #F6D7FF;
-  --color-primary-gradient-end: #7047FF;
-  --color-accent: #EBC8FF;
+  --color-background: #1E1231;
+  --color-surface: #2B1A3D;
+  --color-primary-gradient: #CECECE;
+  --color-primary-gradient-end: #B018C9;
+  --color-accent: #DCC7FF;
   --color-text-main: #FFFFFF;
   --color-sponsored: #F6D38B;
   
@@ -37,11 +37,11 @@
   body {
     @apply bg-background text-text-main font-sans selection:bg-accent selection:text-background;
     background:
-      radial-gradient(circle at 18% 6%, rgba(255, 208, 242, 0.28), transparent 21rem),
-      radial-gradient(circle at 78% 0%, rgba(114, 88, 255, 0.20), transparent 24rem),
-      radial-gradient(circle at 82% 72%, rgba(255, 88, 188, 0.10), transparent 22rem),
-      radial-gradient(circle at 10% 92%, rgba(100, 240, 255, 0.12), transparent 22rem),
-      linear-gradient(180deg, #24132F 0%, #160D20 48%, #100817 100%);
+      radial-gradient(ellipse at 5% 8%, rgba(176, 168, 191, 0.18), transparent 28rem),
+      radial-gradient(ellipse at 92% 4%, rgba(138, 43, 226, 0.24), transparent 26rem),
+      radial-gradient(ellipse at 88% 86%, rgba(176, 168, 191, 0.12), transparent 24rem),
+      radial-gradient(ellipse at 12% 92%, rgba(98, 225, 236, 0.08), transparent 22rem),
+      linear-gradient(180deg, #2A183C 0%, #1E1231 52%, #160B25 100%);
   }
 
   body::before {
@@ -50,10 +50,10 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
-    opacity: 0.2;
+    opacity: 0.26;
     background:
-      linear-gradient(115deg, transparent 0 20%, rgba(255, 255, 255, 0.038) 26%, transparent 34% 60%, rgba(232, 200, 255, 0.028) 66%, transparent 74%),
-      repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 11px);
+      linear-gradient(116deg, transparent 0 22%, rgba(206, 206, 206, 0.07) 28%, transparent 36% 60%, rgba(220, 199, 255, 0.05) 66%, transparent 75%),
+      repeating-linear-gradient(116deg, rgba(255, 255, 255, 0.01) 0 1px, transparent 1px 12px);
     mix-blend-mode: screen;
   }
 }
@@ -63,12 +63,12 @@
   position: relative;
   overflow: hidden;
   background:
-    linear-gradient(110deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 28% 72%, rgba(255, 255, 255, 0.14)),
-    linear-gradient(135deg, #E989D0 0%, #C7A2F8 36%, #7463D8 70%, #5B357A 100%);
+    linear-gradient(45deg, #3B1D68 0%, #7D54BA 22%, #CECECE 48%, #F2EAFE 58%, #B018C9 82%, #FF4DC4 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.3),
-    inset 0 -1px 0 rgba(35, 8, 62, 0.46),
-    0 16px 36px rgba(73, 48, 120, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    inset 0 -1px 0 rgba(50, 24, 86, 0.48),
+    0 0 34px rgba(255, 77, 196, 0.26),
+    0 16px 40px rgba(84, 35, 130, 0.28);
 }
 
 .gradient-button::after {
@@ -76,21 +76,24 @@
   position: absolute;
   inset: 1px;
   border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent 46%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 48%);
   pointer-events: none;
 }
 
 .card-surface {
-  @apply rounded-[var(--radius-card)] border border-white/10;
+  @apply rounded-[var(--radius-card)] border;
   position: relative;
+  border-color: rgba(220, 199, 255, 0.24);
   background:
-    linear-gradient(125deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.025) 34%, rgba(235, 200, 255, 0.045) 74%, rgba(255, 255, 255, 0.065)),
-    linear-gradient(180deg, rgba(58, 43, 72, 0.8) 0%, rgba(31, 20, 42, 0.88) 100%);
+    linear-gradient(135deg, rgba(98, 225, 236, 0.18), rgba(220, 199, 255, 0.2) 42%, rgba(176, 168, 191, 0.18)) border-box,
+    linear-gradient(126deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.025) 34%, rgba(220, 199, 255, 0.08) 74%, rgba(206, 206, 206, 0.09)) padding-box,
+    rgba(43, 26, 61, 0.6);
+  background-clip: border-box, padding-box, padding-box;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.05),
-    0 18px 44px rgba(0, 0, 0, 0.22);
-  backdrop-filter: blur(18px) saturate(1.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(176, 168, 191, 0.08),
+    0 18px 44px rgba(12, 6, 20, 0.2);
+  backdrop-filter: blur(20px) saturate(1.34);
 }
 
 .card-surface::before {
@@ -100,34 +103,43 @@
   border-radius: inherit;
   pointer-events: none;
   background:
-    linear-gradient(105deg, transparent 0 20%, rgba(255, 255, 255, 0.07) 27%, transparent 36% 100%),
-    radial-gradient(circle at 12% 0%, rgba(255, 255, 255, 0.07), transparent 32%);
-  opacity: 0.34;
+    linear-gradient(108deg, transparent 0 20%, rgba(206, 206, 206, 0.12) 28%, transparent 38% 100%),
+    radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.08), transparent 32%);
+  opacity: 0.42;
 }
 
 .glowing-accent {
-  box-shadow: 0 0 18px rgba(235, 200, 255, 0.52), 0 0 38px rgba(255, 107, 190, 0.18), 0 0 48px rgba(126, 107, 255, 0.16);
+  box-shadow: 0 0 18px rgba(220, 199, 255, 0.42), 0 0 34px rgba(176, 168, 191, 0.18);
 }
 
 .text-gradient {
-  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FFFFFF] via-[#FFD7F5] to-[#8D7BFF];
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-[#FFFFFF] via-[#F5F1FA] to-[#CECECE];
 }
 
 .nav-pill {
   @apply flex items-center gap-3 px-4 py-2 rounded-full border border-white/15;
   max-width: calc(100vw - 2rem);
   background:
-    linear-gradient(110deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.035)),
-    rgba(39, 27, 50, 0.72);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.13), 0 18px 40px rgba(47, 27, 70, 0.24);
+    linear-gradient(135deg, rgba(98, 225, 236, 0.12), rgba(220, 199, 255, 0.14), rgba(176, 168, 191, 0.13)) border-box,
+    linear-gradient(115deg, rgba(255, 255, 255, 0.08), rgba(43, 26, 61, 0.68)) padding-box;
+  background-clip: border-box, padding-box;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 18px 40px rgba(25, 13, 40, 0.22);
   backdrop-filter: blur(18px);
+}
+
+.nav-pill svg,
+.metallic-panel svg,
+.card-surface svg,
+button svg {
+  color: #CECECE;
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.28));
 }
 
 .stat-item {
   @apply p-3 rounded-lg text-center border border-white/10;
   background:
-    linear-gradient(130deg, rgba(255, 255, 255, 0.075), rgba(235, 200, 255, 0.035) 46%, rgba(126, 107, 255, 0.055)),
-    rgba(29, 20, 40, 0.78);
+    linear-gradient(135deg, rgba(206, 206, 206, 0.08), rgba(220, 199, 255, 0.055) 48%, rgba(176, 168, 191, 0.07)),
+    rgba(43, 26, 61, 0.6);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 12px 26px rgba(0, 0, 0, 0.14);
   backdrop-filter: blur(14px);
 }
@@ -144,9 +156,11 @@
 
 .metallic-panel {
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025) 34%, rgba(183, 149, 212, 0.06) 70%, rgba(126, 107, 255, 0.075)),
-    rgba(35, 24, 46, 0.76);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+    linear-gradient(135deg, rgba(98, 225, 236, 0.14), rgba(220, 199, 255, 0.14), rgba(176, 168, 191, 0.16)) border-box,
+    linear-gradient(145deg, rgba(206, 206, 206, 0.11), rgba(255, 255, 255, 0.024) 34%, rgba(220, 199, 255, 0.08) 72%, rgba(176, 168, 191, 0.09)) padding-box,
+    rgba(43, 26, 61, 0.6);
+  background-clip: border-box, padding-box, padding-box;
+  border: 1.5px solid transparent;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.12),
     0 20px 48px rgba(0, 0, 0, 0.24);
@@ -155,9 +169,21 @@
 
 .shimmer-ring {
   background:
-    conic-gradient(from 210deg, #FF6BBE, #F6D7FF, #7E6BFF, #75F0FF, #FF6BBE);
-  padding: 3px;
-  box-shadow: 0 0 34px rgba(235, 200, 255, 0.35);
+    conic-gradient(from 210deg, #CECECE, #FFFFFF, #B0A8BF, #DCC7FF, #CECECE);
+  padding: 2px;
+  box-shadow: 0 0 24px rgba(220, 199, 255, 0.38), 0 0 42px rgba(176, 168, 191, 0.12);
+}
+
+.metallic-badge {
+  color: #12091D;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background:
+    linear-gradient(100deg, #8E879C 0%, #F6F3FA 26%, #B0A8BF 48%, #FFFFFF 68%, #7D748B 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -1px 0 rgba(50, 45, 58, 0.2),
+    0 8px 20px rgba(16, 8, 28, 0.18);
+  text-shadow: none;
 }
 
 @media (max-width: 1279px), (pointer: coarse) {
