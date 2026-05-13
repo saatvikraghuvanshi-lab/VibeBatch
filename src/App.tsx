@@ -102,6 +102,45 @@ const getFriendshipLengthLabel = (value?: string) => (
 );
 
 const normalizeTraitName = (value: any) => String(value || '').trim().toLowerCase();
+const getTraitVoteCount = (trait: Partial<Trait>) => Number(trait.votes || 0);
+const getPositiveTraits = (traits: Trait[] = []) => (
+  [...traits]
+    .filter(trait => getTraitVoteCount(trait) > 0)
+    .sort((a, b) => getTraitVoteCount(b) - getTraitVoteCount(a))
+);
+const getTraitVoteTotal = (traits: Trait[] = [], fallbackTotal = 0) => {
+  const traitTotal = traits.reduce((sum, trait) => sum + getTraitVoteCount(trait), 0);
+  return traitTotal > 0 ? traitTotal : Number(fallbackTotal || 0);
+};
+
+const parseChatMessage = (text: string) => {
+  try {
+    const parsed = JSON.parse(text);
+    if (parsed?.type === 'voice' && typeof parsed.url === 'string') {
+      return {
+        type: 'voice',
+        url: parsed.url,
+        duration: Number(parsed.duration || 0),
+      };
+    }
+  } catch {
+    // Plain text messages are stored as raw strings.
+  }
+
+  return { type: 'text', text };
+};
+
+const getChatMessagePreview = (text: string) => {
+  const parsed = parseChatMessage(text);
+  return parsed.type === 'voice' ? 'Voice message' : (parsed.text || '').slice(0, 140);
+};
+
+const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onloadend = () => resolve(String(reader.result || ''));
+  reader.onerror = reject;
+  reader.readAsDataURL(blob);
+});
 
 const mapSupabaseTraits = (rows: any[] = []) => {
   const mapped = PREDEFINED_TRAITS.map(pt => {
@@ -770,7 +809,7 @@ export default function App() {
       body: {
         receiverId: friendId,
         senderName: authState.user.displayName,
-        preview: text.slice(0, 140),
+        preview: getChatMessagePreview(text),
       },
     }).catch((notifyError) => {
       console.warn('Email notification function is not configured yet:', notifyError.message);
@@ -973,7 +1012,9 @@ export default function App() {
     const user = authState.user;
     if (!user) return null;
 
-    const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
+    const votedTraits = getPositiveTraits(user.traits);
+    const topTraits = votedTraits.slice(0, 3);
+    const effectiveTotalVotes = getTraitVoteTotal(user.traits, user.totalVotes);
     const eligibleFriends = user.friends.filter(f => f.isVoteEligible && !f.hasVoted);
     const votedFriends = user.friends.filter(f => f.hasVoted);
     const lockedFriends = user.friends.filter(f => !f.isVoteEligible);
@@ -1104,11 +1145,11 @@ export default function App() {
               </div>
               
               <div className="grid grid-cols-3 gap-3 sm:gap-4">
-                {user.totalVotes > 0 ? topTraits.map((trait, i) => (
+                {topTraits.length > 0 ? topTraits.map((trait, i) => (
                   <div key={trait.id} className="stat-item border-accent/20">
                     <span className="text-2xl block mb-2">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
                     <p className="text-xs font-extrabold uppercase mb-1 tracking-tight truncate w-full">{trait.name}</p>
-                    <p className="text-lg font-display font-black text-accent">{Math.round((trait.votes / user.totalVotes) * 100 || 0)}%</p>
+                    <p className="text-lg font-display font-black text-accent">{Math.round((trait.votes / effectiveTotalVotes) * 100 || 0)}%</p>
                   </div>
                 )) : (
                   [1,2,3].map(i => (
@@ -1124,8 +1165,8 @@ export default function App() {
             <div className="card-surface p-4 sm:p-6 flex-1 min-h-0 flex flex-col min-w-0">
                <h3 className="text-[10px] text-accent font-bold uppercase tracking-[0.2em] mb-6">Trait Breakdown</h3>
                <div className="space-y-5 overflow-y-auto pr-2 custom-scrollbar">
-                  {[...user.traits].sort((a,b) => b.votes - a.votes).slice(0, 8).map(trait => (
-                    <TraitRow key={trait.id} trait={trait} total={user.totalVotes} />
+                  {(votedTraits.length > 0 ? votedTraits : [...user.traits].sort((a,b) => b.votes - a.votes)).slice(0, 8).map(trait => (
+                    <TraitRow key={trait.id} trait={trait} total={effectiveTotalVotes} />
                   ))}
                </div>
             </div>
@@ -1770,7 +1811,9 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onOpenInvite, onUpda
 
 function TraitsScreen({ onBack, user }: any) {
   const sortedTraits = [...user.traits].sort((a, b) => b.votes - a.votes);
-  const top3 = sortedTraits.slice(0, 3);
+  const votedTraits = getPositiveTraits(user.traits);
+  const top3 = votedTraits.slice(0, 3);
+  const effectiveTotalVotes = getTraitVoteTotal(user.traits, user.totalVotes);
   
   return (
     <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
@@ -1785,11 +1828,11 @@ function TraitsScreen({ onBack, user }: any) {
       </div>
 
       <div className="grid grid-cols-3 gap-3 mb-8">
-        {user.totalVotes > 0 ? top3.map((trait, i) => (
+        {top3.length > 0 ? top3.map((trait, i) => (
           <div key={trait.id} className={`card-surface p-4 flex flex-col items-center justify-center text-center relative overflow-hidden ${i === 0 ? 'border-accent/40 shadow-lg shadow-accent/5' : ''} ${trait.category === 'sponsored' ? 'border-sponsored/40 bg-sponsored/5' : ''}`}>
              <span className={`text-2xl font-bold font-display mb-1 ${trait.category === 'sponsored' ? 'text-sponsored' : i === 0 ? 'text-accent' : i === 1 ? 'text-white/60' : 'text-white/40'}`}>#{i + 1}</span>
              <span className="text-xs font-bold block mb-1">{trait.name}</span>
-             <Badge color={trait.category === 'sponsored' ? 'amber' : i === 0 ? 'accent' : 'pink'}>{Math.round((trait.votes / user.totalVotes) * 100)}%</Badge>
+             <Badge color={trait.category === 'sponsored' ? 'amber' : i === 0 ? 'accent' : 'pink'}>{Math.round((trait.votes / effectiveTotalVotes) * 100)}%</Badge>
              {trait.category === 'sponsored' && (
                <p className="text-[7px] text-sponsored font-black uppercase mt-3 tracking-widest border-t border-sponsored/20 pt-2 w-full">Sponsored by {trait.sponsoredBy}</p>
              )}
@@ -1806,9 +1849,10 @@ function TraitsScreen({ onBack, user }: any) {
       </div>
 
       <div className="space-y-6">
-        <TraitCategory label="Predefined Traits" traits={sortedTraits.filter(t => t.category === 'predefined')} total={user.totalVotes} />
-        <TraitCategory label="Sponsored Traits" traits={sortedTraits.filter(t => t.category === 'sponsored')} total={user.totalVotes} sponsored />
-        <TraitCategory label="Custom Traits" traits={sortedTraits.filter(t => t.category === 'custom')} total={user.totalVotes} custom />
+        <TraitCategory label="Voted Traits" traits={votedTraits} total={effectiveTotalVotes} />
+        <TraitCategory label="Predefined Traits" traits={sortedTraits.filter(t => t.category === 'predefined' && t.votes === 0)} total={effectiveTotalVotes} />
+        <TraitCategory label="Sponsored Traits" traits={sortedTraits.filter(t => t.category === 'sponsored' && t.votes === 0)} total={effectiveTotalVotes} sponsored />
+        <TraitCategory label="Custom Traits" traits={sortedTraits.filter(t => t.category === 'custom' && t.votes === 0)} total={effectiveTotalVotes} custom />
       </div>
     </div>
   );
@@ -2120,12 +2164,26 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
   const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<BlobPart[]>([]);
+  const recordingStartedAtRef = useRef(0);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [friend.messages]);
+
+  useEffect(() => (
+    () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.onstop = null;
+        mediaRecorderRef.current.stop();
+      }
+      streamRef.current?.getTracks().forEach(track => track.stop());
+    }
+  ), []);
 
   const send = (e: any) => {
     e.preventDefault();
@@ -2134,14 +2192,53 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
     setMessage('');
   };
 
-  const toggleRecording = () => {
+  const stopRecording = () => {
+    mediaRecorderRef.current?.stop();
+  };
+
+  const toggleRecording = async () => {
     if (isRecording) {
-      onSendMessage('Voice message');
-      setIsRecording(false);
+      stopRecording();
       return;
     }
 
-    setIsRecording(true);
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      alert('Voice recording is not supported in this browser.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      streamRef.current = stream;
+      audioChunksRef.current = [];
+      recordingStartedAtRef.current = Date.now();
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+
+      recorder.onstop = async () => {
+        const duration = Math.max(1, Math.round((Date.now() - recordingStartedAtRef.current) / 1000));
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        streamRef.current?.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+        mediaRecorderRef.current = null;
+        setIsRecording(false);
+
+        if (!blob.size) return;
+
+        const url = await blobToDataUrl(blob);
+        onSendMessage(JSON.stringify({ type: 'voice', url, duration }));
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch (error) {
+      console.error(error);
+      alert('Could not access the microphone.');
+    }
   };
 
   const handleAttachments = (files: FileList | null) => {
@@ -2182,20 +2279,37 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
             <p className="text-[10px]">Start the conversation below</p>
           </div>
         )}
-        {friend.messages.map((m: any) => (
-          <div key={m.id} className={`flex ${m.senderId === 'me' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-              m.senderId === 'me' 
-                ? 'bg-accent text-background font-medium rounded-tr-none shadow-lg shadow-accent/10' 
-                : 'bg-surface border border-white/5 rounded-tl-none'
-            }`}>
-              {m.text}
-              <p className={`text-[8px] mt-1 opacity-50 font-bold text-right ${m.senderId === 'me' ? 'text-black/60' : 'text-white/40'}`}>
-                {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </p>
+        {friend.messages.map((m: any) => {
+          const parsedMessage = parseChatMessage(m.text);
+          const mine = m.senderId === 'me';
+
+          return (
+            <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+                mine
+                  ? 'bg-accent text-background font-medium rounded-tr-none shadow-lg shadow-accent/10'
+                  : 'bg-surface border border-white/5 rounded-tl-none'
+              }`}>
+                {parsedMessage.type === 'voice' ? (
+                  <div className="space-y-2 min-w-[220px]">
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="font-bold">Voice message</span>
+                      <span className={`text-[10px] font-black ${mine ? 'text-black/45' : 'text-white/35'}`}>
+                        {parsedMessage.duration}s
+                      </span>
+                    </div>
+                    <audio src={parsedMessage.url} controls className="w-full h-9" />
+                  </div>
+                ) : (
+                  parsedMessage.text
+                )}
+                <p className={`text-[8px] mt-1 opacity-50 font-bold text-right ${mine ? 'text-black/60' : 'text-white/40'}`}>
+                  {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <form onSubmit={send} className="p-4 border-t border-white/5 bg-surface/30 shrink-0">
@@ -2383,7 +2497,8 @@ const TraitRow = ({ trait, total }: any) => {
 }
 
 function PublicProfileScreen({ user, onBack, onVote }: any) {
-  const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
+  const topTraits = getPositiveTraits(user.traits || []).slice(0, 3);
+  const effectiveTotalVotes = getTraitVoteTotal(user.traits || [], user.totalVotes);
   const friendsCount = Array.isArray(user.friends) ? user.friends.length : 0;
 
   return (
@@ -2417,7 +2532,7 @@ function PublicProfileScreen({ user, onBack, onVote }: any) {
 
         <div className="flex items-center gap-6 py-4 border-y border-white/5 w-full justify-center">
            <div className="text-center">
-             <p className="text-xl font-bold font-display">{user.totalVotes}</p>
+             <p className="text-xl font-bold font-display">{effectiveTotalVotes}</p>
              <p className="text-[10px] text-white/40 uppercase tracking-widest font-bold">Votes</p>
            </div>
            <div className="w-px h-8 bg-white/5" />
@@ -2441,8 +2556,9 @@ function PublicProfileScreen({ user, onBack, onVote }: any) {
 }
 
 function StoryCardGeneratorScreen({ user, onBack }: any) {
-  const topTraits = [...user.traits].sort((a, b) => b.votes - a.votes).slice(0, 3);
-  const hasVotes = Number(user.totalVotes || 0) > 0;
+  const topTraits = getPositiveTraits(user.traits).slice(0, 3);
+  const effectiveTotalVotes = getTraitVoteTotal(user.traits, user.totalVotes);
+  const hasVotes = topTraits.length > 0;
 
   const downloadStoryCard = async () => {
     const canvas = document.createElement('canvas');
@@ -2528,6 +2644,9 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       ctx.fillStyle = '#FFFFFF';
       ctx.font = '700 24px Inter, Arial';
       ctx.fillText(trait.name || 'Trait', x + 110, 1008, 180);
+      ctx.fillStyle = 'rgba(235,199,255,0.82)';
+      ctx.font = '900 22px Inter, Arial';
+      ctx.fillText(`${Math.round(((trait.votes || 0) / Math.max(effectiveTotalVotes, 1)) * 100)}%`, x + 110, 1042);
     });
 
     if (!hasVotes) [0, 1, 2].forEach((index) => {
@@ -2601,6 +2720,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
                  <div key={t.id} className="bg-surface/50 backdrop-blur-md border border-white/10 rounded-xl p-3 flex flex-col items-center gap-1 flex-1 min-w-0">
                     <span className="text-[10px] font-black text-accent uppercase tracking-tighter truncate w-full text-center">#{i+1}</span>
                     <span className="text-[10px] font-bold text-white truncate w-full text-center">{t.name}</span>
+                    <span className="text-[9px] font-black text-accent/80">{Math.round(((t.votes || 0) / Math.max(effectiveTotalVotes, 1)) * 100)}%</span>
                  </div>
                )) : (
                  [1,2,3].map(i => (
