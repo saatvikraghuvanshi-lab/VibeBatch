@@ -135,12 +135,14 @@ const getChatMessagePreview = (text: string) => {
   return parsed.type === 'voice' ? 'Voice message' : (parsed.text || '').slice(0, 140);
 };
 
-const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onloadend = () => resolve(String(reader.result || ''));
-  reader.onerror = reject;
-  reader.readAsDataURL(blob);
-});
+const buildIdentityTitleFromTraits = (traits: Trait[] = []) => {
+  const topTraits = getPositiveTraits(traits).slice(0, 3);
+  if (topTraits.length === 0) return 'The Emerging Soul';
+
+  const first = topTraits[0]?.name?.split(/\s+/)[0] || 'Vivid';
+  const second = topTraits[1]?.name?.split(/\s+/).slice(-1)[0] || 'Presence';
+  return `The ${first} ${second}`;
+};
 
 const mergeStableUserState = (freshUser: UserProfile, previousUser?: UserProfile | null): UserProfile => {
   if (!previousUser) return freshUser;
@@ -161,6 +163,9 @@ const mergeStableUserState = (freshUser: UserProfile, previousUser?: UserProfile
 
 const hasRecordedTraitVotes = (profile?: { traits?: Trait[]; totalVotes?: number } | null) => (
   getTraitVoteTotal(profile?.traits || [], profile?.totalVotes || 0) > 0
+);
+const hasConfirmedTraitVote = (link: any, profile?: { traits?: Trait[]; totalVotes?: number } | null) => (
+  Boolean(link?.has_voted && hasRecordedTraitVotes(profile))
 );
 const getConfirmedVoteKey = (userId?: string, friendId?: string) => (
   userId && friendId ? `vibebatch_confirmed_trait_vote_${userId}_${friendId}` : ''
@@ -220,6 +225,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   const isVoteEligible = isEligibleLength(relationshipLength) && isEligibleLength(friendRelationshipLength);
   const traits = mapSupabaseTraits(profile.traits || []);
   const totalVotes = profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
+  const voteRecord = { traits, totalVotes };
 
   return ({
   id: profile.id,
@@ -227,7 +233,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   displayName: profile.display_name || profile.username || 'New friend',
   avatar: profile.avatar_url || '',
   friendshipDate: link?.created_at || new Date().toISOString(),
-  hasVoted: hasLocalConfirmedVote(link?.user_id, profile.id),
+  hasVoted: hasConfirmedTraitVote(link, voteRecord) || hasLocalConfirmedVote(link?.user_id, profile.id),
   relationshipLength,
   friendRelationshipLength,
   isVoteEligible,
@@ -277,6 +283,28 @@ export default function App() {
   useEffect(() => {
     saveStore(authState);
   }, [authState]);
+
+  useEffect(() => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event) => {
+      if (event !== 'PASSWORD_RECOVERY') return;
+
+      const newPassword = window.prompt('Enter your new VibeBatch password');
+      if (!newPassword) return;
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) {
+        alert(error.message || 'Failed to update password.');
+        return;
+      }
+
+      alert('Password updated. Please log in with your new password.');
+      await supabase.auth.signOut();
+      setAuthState({ user: null, isAuthenticated: false });
+      setCurrentScreen('login');
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -358,25 +386,38 @@ export default function App() {
   };
 
   const submitTraitVotes = async (targetUserId: string, traitNames: string[]) => {
-    const rpcResults = await Promise.all(traitNames.map(traitName =>
+    const uniqueTraitNames = [...new Set(traitNames)];
+    const beforeRows = (await loadTraitsForProfileIds([targetUserId])).get(targetUserId) || [];
+    const beforeVoteTotal = getTraitVoteTotal(mapSupabaseTraits(beforeRows));
+
+    const rpcResults = await Promise.all(uniqueTraitNames.map(traitName =>
       supabase.rpc('increment_trait_vote', {
         target_user_id: targetUserId,
         trait_name: traitName,
       })
     ));
 
-    const rpcErrors = rpcResults
-      .map(result => result.error)
-      .filter(Boolean);
+    const failedTraitWrites = rpcResults
+      .map((result, index) => ({ traitName: uniqueTraitNames[index], error: result.error }))
+      .filter(result => result.error);
 
-    if (rpcErrors.length === 0) return;
+    if (failedTraitWrites.length > 0) {
+      console.warn('Trait vote RPC failed, trying direct trait write:', failedTraitWrites.map(result => result.error));
+      try {
+        await Promise.all(failedTraitWrites.map(result => incrementTraitDirectly(targetUserId, result.traitName)));
+      } catch (fallbackError) {
+        console.error('Direct trait write failed:', fallbackError);
+        throw new Error(
+          failedTraitWrites.map((result: any) => result.error?.message).filter(Boolean).join('\n') ||
+          'Trait vote could not be recorded.'
+        );
+      }
+    }
 
-    console.warn('Trait vote RPC failed, trying direct trait write:', rpcErrors);
-    try {
-      await Promise.all(traitNames.map(traitName => incrementTraitDirectly(targetUserId, traitName)));
-    } catch (fallbackError) {
-      console.error('Direct trait write failed:', fallbackError);
-      throw new Error(rpcErrors.map((error: any) => error.message).join('\n') || 'Trait vote could not be recorded.');
+    const afterRows = (await loadTraitsForProfileIds([targetUserId])).get(targetUserId) || [];
+    const afterVoteTotal = getTraitVoteTotal(mapSupabaseTraits(afterRows));
+    if (afterVoteTotal <= beforeVoteTotal) {
+      throw new Error('Trait vote could not be confirmed. Please try again.');
     }
   };
 
@@ -692,6 +733,7 @@ export default function App() {
     const password = formData.get('password') as string;
     const username = (formData.get('username') as string).toLowerCase().replace('@', '');
     const displayName = formData.get('displayName') as string;
+    const contactNumber = String(formData.get('contact') || '').trim();
 
     try {
       const { data: usernameMatch, error: usernameError } = await supabase
@@ -735,6 +777,7 @@ export default function App() {
           data: {
             username,
             display_name: displayName,
+            contact_number: contactNumber || null,
             avatar_url: avatarUrl,
             invited_by: window.localStorage.getItem('vibebatch_pending_invite'),
           },
@@ -936,11 +979,18 @@ export default function App() {
 
   const sendMessage = async (friendId: string, text: string) => {
     if (!authState.user) return;
+
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const senderId = authData.user?.id;
+    if (authError || !senderId) {
+      alert('Please log in again before sending messages.');
+      return;
+    }
     
     const { data: insertedMessage, error } = await supabase
       .from('messages')
       .insert([{
-        sender_id: authState.user.id,
+        sender_id: senderId,
         receiver_id: friendId,
         content: text
       }])
@@ -992,6 +1042,36 @@ export default function App() {
     ));
   };
 
+  const uploadVoiceMessage = async (friendId: string, blob: Blob, duration: number) => {
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    const senderId = authData.user?.id;
+    if (authError || !senderId) {
+      throw new Error('Please log in again before sending voice messages.');
+    }
+
+    const extension = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const filePath = `${senderId}/voice/${friendId}-${Date.now()}.${extension}`;
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(filePath, blob, {
+        cacheControl: '3600',
+        contentType: blob.type || 'audio/webm',
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(filePath);
+
+    await sendMessage(friendId, JSON.stringify({
+      type: 'voice',
+      url: data.publicUrl,
+      duration,
+    }));
+  };
+
   const openChatWithFriend = async (friend: Friend) => {
     setSelectedFriend({ ...friend, messagesCount: 0 });
     setCurrentScreen('chat');
@@ -1016,17 +1096,93 @@ export default function App() {
     setIsProfileSheetOpen(false);
   };
 
+  const resetPassword = async (emailOverride?: string) => {
+    const email = emailOverride || window.prompt('Enter the email for your VibeBatch account');
+    if (!email?.trim()) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin,
+      });
+
+      if (error) throw error;
+      alert('Password reset email sent. Check your inbox.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to send password reset email.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const updateIdentity = async () => {
     if (!authState.user) return;
     setLoading(true);
     try {
-      const title = await generateIdentityTitle(authState.user.traits);
+      const freshUser = await loadCurrentUserProfile(authState.user.id);
+      const traits = freshUser?.traits || authState.user.traits;
+      const votedTraits = getPositiveTraits(traits);
+      if (votedTraits.length === 0) {
+        alert('You need at least one voted trait before generating an identity title.');
+        return;
+      }
+
+      const generatedTitle = await generateIdentityTitle(traits);
+      const title = generatedTitle === 'The Magnetic Storyteller'
+        ? buildIdentityTitleFromTraits(traits)
+        : generatedTitle;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ identity_title: title })
+        .eq('id', authState.user.id);
+
+      if (error) throw error;
+
       setAuthState(prev => ({
         ...prev,
-        user: prev.user ? { ...prev.user, identityTitle: title } : null
+        user: prev.user ? { ...(freshUser || prev.user), identityTitle: title } : null
       }));
+      alert(`Identity title updated: ${title}`);
     } catch (error) {
       console.error("Failed to generate title", error);
+      alert('Failed to regenerate identity title.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const manageCustomTraits = async () => {
+    if (!authState.user) return;
+    const customTraits = (authState.user.traits || [])
+      .filter(trait => trait.category === 'custom')
+      .map(trait => trait.name);
+    const traitName = window.prompt(
+      `Add a custom trait for your profile.${customTraits.length ? `\n\nCurrent custom traits:\n${customTraits.join('\n')}` : ''}\n\nEnter a new trait name:`
+    );
+
+    const cleanName = traitName?.trim();
+    if (!cleanName) return;
+
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('traits')
+        .upsert([{
+          user_id: authState.user.id,
+          trait_id: cleanName,
+          votes_count: 0,
+        }], { onConflict: 'user_id,trait_id' });
+
+      if (error) throw error;
+
+      const freshUser = await loadCurrentUserProfile(authState.user.id);
+      if (freshUser) {
+        setAuthState(prev => ({ ...prev, user: mergeStableUserState(freshUser, prev.user) }));
+      }
+      alert('Custom trait added.');
+    } catch (err: any) {
+      alert(err.message || 'Failed to save custom trait.');
     } finally {
       setLoading(false);
     }
@@ -1080,7 +1236,7 @@ export default function App() {
 
   // --- Screen Components ---
 
-  const AuthScreen = ({ onLogin, onSignup, isLoginView, setIsLoginView, loading, avatarPreview, onAvatarChange }: any) => (
+  const AuthScreen = ({ onLogin, onSignup, onResetPassword, isLoginView, setIsLoginView, loading, avatarPreview, onAvatarChange }: any) => (
     <div className="min-h-screen flex flex-col p-6 max-w-md mx-auto w-full">
       <div className="flex-1 flex flex-col justify-center gap-8 py-12">
         <div className="text-center space-y-2">
@@ -1095,7 +1251,13 @@ export default function App() {
               <input name="password" type="password" placeholder="Password" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
             </div>
             <div className="text-right">
-              <button type="button" className="text-accent text-sm font-medium hover:underline">Forgot password?</button>
+              <button
+                type="button"
+                onClick={() => onResetPassword()}
+                className="text-accent text-sm font-medium hover:underline"
+              >
+                Forgot password?
+              </button>
             </div>
             <Button type="submit" disabled={loading}>
               {loading ? "Logging in..." : "Log in →"}
@@ -1473,6 +1635,7 @@ export default function App() {
       <AuthScreen 
         onLogin={handleLogin} 
         onSignup={handleSignup} 
+        onResetPassword={resetPassword}
         isLoginView={isLoginView} 
         setIsLoginView={setIsLoginView} 
         loading={loading} 
@@ -1567,6 +1730,7 @@ export default function App() {
               friend={selectedFriend} 
               onBack={() => setCurrentScreen('friends')} 
               onSendMessage={(text: string) => sendMessage(selectedFriend.id, text)}
+              onSendVoice={(blob: Blob, duration: number) => uploadVoiceMessage(selectedFriend.id, blob, duration)}
             />
           )}
 
@@ -1635,6 +1799,8 @@ export default function App() {
             onUpdateTitle={updateIdentity} 
             onUpdatePhoto={updateProfilePhoto}
             onUpdateDisplayName={updateDisplayName}
+            onManageCustomTraits={manageCustomTraits}
+            onResetPassword={resetPassword}
             onDeleteAccount={deleteAccount}
             onNavigate={(s: string) => { setIsProfileSheetOpen(false); setCurrentScreen(s); }}
           />
@@ -2198,7 +2364,11 @@ function VotingScreen({ friend, onBack, onVote }: any) {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const traits = PREDEFINED_TRAITS.map(t => t.name!);
+  const customTraitNames = (friend.traits || [])
+    .filter((trait: Trait) => trait.category === 'custom')
+    .map((trait: Trait) => trait.name)
+    .filter(Boolean);
+  const traits = [...new Set([...PREDEFINED_TRAITS.map(t => t.name!), ...customTraitNames])];
 
   const toggleTrait = (name: string) => {
     setSelectedTraits(prev => 
@@ -2315,7 +2485,7 @@ function StaticScreen({ title, onBack }: any) {
   )
 }
 
-function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
+function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -2341,11 +2511,12 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
     }
   ), []);
 
-  const send = (e: any) => {
+  const send = async (e: any) => {
     e.preventDefault();
     if (!message.trim()) return;
-    onSendMessage(message);
+    const nextMessage = message;
     setMessage('');
+    await onSendMessage(nextMessage);
   };
 
   const stopRecording = () => {
@@ -2384,8 +2555,12 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
 
         if (!blob.size) return;
 
-        const url = await blobToDataUrl(blob);
-        onSendMessage(JSON.stringify({ type: 'voice', url, duration }));
+        try {
+          await onSendVoice(blob, duration);
+        } catch (error: any) {
+          console.error(error);
+          alert(error.message || 'Voice message failed to send.');
+        }
       };
 
       mediaRecorderRef.current = recorder;
@@ -2520,7 +2695,7 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
   );
 }
 
-function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onUpdatePhoto, onUpdateDisplayName, onDeleteAccount, onNavigate }: any) {
+function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onUpdatePhoto, onUpdateDisplayName, onManageCustomTraits, onResetPassword, onDeleteAccount, onNavigate }: any) {
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
 
   return (
@@ -2578,8 +2753,8 @@ function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onUpdatePhoto, o
           />
           <SheetOption icon={<Camera size={18} />} label="Update profile photo" onClick={() => profilePhotoInputRef.current?.click()} />
           <SheetOption icon={<Users size={18} />} label="Update display name" onClick={onUpdateDisplayName} />
-          <SheetOption icon={<Sparkles size={18} />} label="Manage custom traits" />
-          <SheetOption icon={<Lock size={18} />} label="Reset password" />
+          <SheetOption icon={<Sparkles size={18} />} label="Manage custom traits" onClick={onManageCustomTraits} />
+          <SheetOption icon={<Lock size={18} />} label="Reset password" onClick={() => onResetPassword()} />
           <SheetOption icon={<Download size={18} />} label="Download Story Card" onClick={() => onNavigate('storycard')} />
           <SheetOption 
             icon={<Sparkles className="text-accent" size={18} />} 
