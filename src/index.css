@@ -2,7 +2,7 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #07040A;
+  --color-background: #0B0611;
   --color-surface: #17101F;
   --color-primary-gradient: #F6D7FF;
   --color-primary-gradient-end: #7047FF;
@@ -41,7 +41,7 @@
       radial-gradient(circle at 78% 0%, rgba(114, 88, 255, 0.24), transparent 24rem),
       radial-gradient(circle at 82% 72%, rgba(255, 88, 188, 0.14), transparent 22rem),
       radial-gradient(circle at 10% 92%, rgba(100, 240, 255, 0.12), transparent 22rem),
-      linear-gradient(180deg, #100717 0%, #07040A 48%, #050306 100%);
+      linear-gradient(180deg, #14091D 0%, #0B0611 48%, #08040C 100%);
   }
 
   body::before {

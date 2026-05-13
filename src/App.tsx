@@ -35,6 +35,8 @@ import {
   Send,
   Share,
   Menu,
+  Mic,
+  Plus,
 } from 'lucide-react';
 import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
 import { getStore, saveStore } from '../lib/store';
@@ -1529,6 +1531,46 @@ function FriendDetailsModal({ friend, onClose }: any) {
   );
 }
 
+function SocialLogo({ label }: { label: string }) {
+  if (label === 'WhatsApp') {
+    return (
+      <span className="w-11 h-11 rounded-2xl bg-[#25D366] flex items-center justify-center shadow-lg shadow-[#25D366]/20">
+        <svg viewBox="0 0 32 32" className="w-7 h-7 text-white" aria-hidden="true">
+          <path fill="currentColor" d="M16 4.4c-6.2 0-11.2 4.8-11.2 10.8 0 2 .6 3.9 1.6 5.5L5.1 27l6.5-1.7c1.4.6 2.9.9 4.4.9 6.2 0 11.2-4.8 11.2-10.8S22.2 4.4 16 4.4Zm0 19.8c-1.4 0-2.8-.3-4-.9l-.4-.2-3.8 1 1-3.6-.3-.4c-1-1.4-1.5-3-1.5-4.8 0-4.8 4-8.7 9-8.7s9 3.9 9 8.7-4 8.9-9 8.9Zm5-6.5c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.2-.2.3-.8.9-1 1.1-.2.2-.4.2-.7.1-.3-.1-1.2-.4-2.3-1.4-.8-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.7-1.6-1-2.2-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.3 5.2 4.5.7.3 1.3.5 1.8.6.8.2 1.4.2 2 .1.6-.1 1.7-.7 2-1.4.2-.7.2-1.3.2-1.4-.2-.3-.4-.4-.7-.5Z" />
+        </svg>
+      </span>
+    );
+  }
+
+  if (label === 'Facebook') {
+    return (
+      <span className="w-11 h-11 rounded-2xl bg-[#1877F2] flex items-center justify-center shadow-lg shadow-[#1877F2]/20">
+        <span className="text-white text-3xl font-black font-sans leading-none">f</span>
+      </span>
+    );
+  }
+
+  if (label === 'Instagram') {
+    return (
+      <span className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-lg shadow-pink-500/20 bg-[radial-gradient(circle_at_30%_110%,#FEDA75_0_18%,#FA7E1E_28%,#D62976_52%,#962FBF_74%,#4F5BD5_100%)]">
+        <svg viewBox="0 0 32 32" className="w-7 h-7 text-white" aria-hidden="true">
+          <rect x="8" y="8" width="16" height="16" rx="5" fill="none" stroke="currentColor" strokeWidth="2.5" />
+          <circle cx="16" cy="16" r="4" fill="none" stroke="currentColor" strokeWidth="2.5" />
+          <circle cx="21.2" cy="10.9" r="1.4" fill="currentColor" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="w-11 h-11 rounded-2xl bg-[#FFFC00] flex items-center justify-center shadow-lg shadow-[#FFFC00]/20">
+      <svg viewBox="0 0 32 32" className="w-7 h-7 text-black" aria-hidden="true">
+        <path fill="currentColor" d="M16 5.5c3.6 0 6 2.5 6 6.2v3.2c0 .7.4 1.2 1.1 1.5l2 .8c.5.2.6.9.1 1.2l-2.2 1.4c-.3.2-.5.4-.6.8-.3 1.4-1.2 2.2-2.9 2.5-.5.1-.9.4-1.2.8-.6.9-1.4 1.5-2.3 1.5s-1.7-.6-2.3-1.5c-.3-.4-.7-.7-1.2-.8-1.7-.3-2.6-1.1-2.9-2.5-.1-.4-.3-.6-.6-.8l-2.2-1.4c-.5-.3-.4-1 .1-1.2l2-.8c.7-.3 1.1-.8 1.1-1.5v-3.2c0-3.7 2.4-6.2 6-6.2Z" />
+      </svg>
+    </span>
+  );
+}
+
 function InviteFriendScreen({ link, onBack, onCopy }: any) {
   const message = `Join me on VibeBatch: ${link}`;
   const encodedLink = encodeURIComponent(link);
@@ -1591,9 +1633,10 @@ function InviteFriendScreen({ link, onBack, onCopy }: any) {
                 href={target.href}
                 target="_blank"
                 rel="noreferrer"
-                className="bg-background/70 border border-white/10 rounded-xl p-4 text-center text-xs font-black uppercase tracking-wider hover:border-accent/40 hover:text-accent transition-colors"
+                className="bg-background/70 border border-white/10 rounded-xl p-4 text-center text-xs font-black uppercase tracking-wider hover:border-accent/40 hover:text-accent transition-colors flex flex-col items-center gap-3"
               >
-                {target.label}
+                <SocialLogo label={target.label} />
+                <span>{target.label}</span>
               </a>
             ))}
           </div>
@@ -2074,7 +2117,9 @@ function StaticScreen({ title, onBack }: any) {
 
 function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
   const [message, setMessage] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -2087,6 +2132,22 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
     if (!message.trim()) return;
     onSendMessage(message);
     setMessage('');
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      onSendMessage('Voice message');
+      setIsRecording(false);
+      return;
+    }
+
+    setIsRecording(true);
+  };
+
+  const handleAttachments = (files: FileList | null) => {
+    if (!files?.length) return;
+    const fileNames = Array.from(files).map(file => file.name).join(', ');
+    onSendMessage(`Attachment${files.length > 1 ? 's' : ''}: ${fileNames}`);
   };
 
   return (
@@ -2138,14 +2199,44 @@ function ChatDetailScreen({ friend, onBack, onSendMessage }: any) {
       </div>
 
       <form onSubmit={send} className="p-4 border-t border-white/5 bg-surface/30 shrink-0">
-        <div className="flex gap-2">
+        <input
+          ref={attachmentInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            handleAttachments(e.target.files);
+            e.target.value = '';
+          }}
+        />
+        <div className="flex gap-2 items-center">
+          <button
+            type="button"
+            onClick={() => attachmentInputRef.current?.click()}
+            className="bg-surface border border-white/10 text-white/60 p-3 rounded-xl hover:text-accent hover:border-accent/40 transition-colors"
+            aria-label="Add photos, documents, or files"
+          >
+            <Plus size={20} />
+          </button>
           <input 
             type="text" 
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="Type a message..." 
+            placeholder={isRecording ? "Recording voice..." : "Type a message..."} 
             className="flex-1 bg-surface border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-accent/50 transition-colors"
           />
+          <button
+            type="button"
+            onClick={toggleRecording}
+            className={`border p-3 rounded-xl transition-colors ${
+              isRecording
+                ? 'bg-red-500/15 border-red-400/40 text-red-300'
+                : 'bg-surface border-white/10 text-white/60 hover:text-accent hover:border-accent/40'
+            }`}
+            aria-label={isRecording ? 'Stop recording voice message' : 'Record voice message'}
+          >
+            <Mic size={20} />
+          </button>
           <button 
             type="submit"
             disabled={!message.trim()}
