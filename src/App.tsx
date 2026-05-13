@@ -142,6 +142,23 @@ const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
   reader.readAsDataURL(blob);
 });
 
+const mergeStableUserState = (freshUser: UserProfile, previousUser?: UserProfile | null): UserProfile => {
+  if (!previousUser) return freshUser;
+
+  const freshHasVotes = getPositiveTraits(freshUser.traits).length > 0;
+  const previousHasVotes = getPositiveTraits(previousUser.traits).length > 0;
+  const freshFriends = freshUser.friends.length > 0 || previousUser.friends.length === 0
+    ? freshUser.friends
+    : previousUser.friends;
+
+  return {
+    ...freshUser,
+    friends: freshFriends,
+    traits: freshHasVotes || !previousHasVotes ? freshUser.traits : previousUser.traits,
+    totalVotes: getTraitVoteTotal(freshUser.traits, freshUser.totalVotes) || previousUser.totalVotes,
+  };
+};
+
 const mapSupabaseTraits = (rows: any[] = []) => {
   const mapped = PREDEFINED_TRAITS.map(pt => {
     const traitName = pt.name || '';
@@ -259,16 +276,36 @@ export default function App() {
     setSignupAvatarPreview(file ? URL.createObjectURL(file) : '');
   };
 
+  const loadTraitsForProfileIds = async (profileIds: string[]) => {
+    if (profileIds.length === 0) return new Map<string, any[]>();
+
+    const candidateColumns = ['user_id', 'profile_id', 'target_user_id'];
+    for (const column of candidateColumns) {
+      const { data, error } = await supabase
+        .from('traits')
+        .select('*')
+        .in(column, profileIds);
+
+      if (!error && data) {
+        return data.reduce((map: Map<string, any[]>, row: any) => {
+          const ownerId = row[column];
+          if (!ownerId) return map;
+          map.set(ownerId, [...(map.get(ownerId) || []), row]);
+          return map;
+        }, new Map<string, any[]>());
+      }
+    }
+
+    return new Map<string, any[]>();
+  };
+
   const refreshFriends = async (userId: string) => {
     const { data: links, error: linksError } = await supabase
       .from('friendships')
       .select('friend_id, relationship_length, has_voted, created_at')
       .eq('user_id', userId);
 
-    if (linksError) {
-      console.warn('Could not load friends yet:', linksError.message);
-      return [];
-    }
+    if (linksError) throw linksError;
 
     const friendIds = (links || []).map((link: any) => link.friend_id);
     if (friendIds.length === 0) return [];
@@ -287,6 +324,7 @@ export default function App() {
       .in('id', friendIds);
 
     if (profilesError) throw profilesError;
+    const explicitTraits = await loadTraitsForProfileIds(friendIds);
 
     const { data: messages, error: messagesError } = await supabase
       .from('messages')
@@ -299,9 +337,13 @@ export default function App() {
     }
 
     return (profiles || []).map((profile: any) => {
+      const profileWithTraits = {
+        ...profile,
+        traits: profile.traits?.length ? profile.traits : (explicitTraits.get(profile.id) || []),
+      };
       const link = links?.find((item: any) => item.friend_id === profile.id);
       const reverseLink = reverseLinks?.find((item: any) => item.user_id === profile.id);
-      const friend = mapProfileToFriend(profile, link, reverseLink);
+      const friend = mapProfileToFriend(profileWithTraits, link, reverseLink);
       const friendMessages = (messages || [])
         .filter((message: any) => (
           (message.sender_id === userId && message.receiver_id === profile.id) ||
@@ -402,13 +444,15 @@ export default function App() {
         .single();
 
       if (error || !profile) return;
+      const explicitTraits = await loadTraitsForProfileIds([friend.id]);
+      const traits = profile.traits?.length ? profile.traits : (explicitTraits.get(friend.id) || []);
 
       setFriendDetails({
         ...friend,
         username: profile.username || friend.username,
         displayName: profile.display_name || friend.displayName,
         avatar: profile.avatar_url || friend.avatar,
-        traits: mapSupabaseTraits(profile.traits || []),
+        traits: mapSupabaseTraits(traits),
       });
     } catch (error) {
       console.warn('Could not refresh friend details:', error);
@@ -431,8 +475,12 @@ export default function App() {
     if (error) throw error;
     if (!profile) return null;
 
+    const explicitTraits = await loadTraitsForProfileIds([userId]);
     const friends = await refreshFriends(userId);
-    return mapProfileToUser(profile, friends);
+    return mapProfileToUser({
+      ...profile,
+      traits: profile.traits?.length ? profile.traits : (explicitTraits.get(userId) || []),
+    }, friends);
   };
 
   const refreshCurrentUserProfile = useCallback(async () => {
@@ -445,7 +493,7 @@ export default function App() {
 
       setAuthState(prev => ({
         ...prev,
-        user: prev.user?.id === userId ? user : prev.user,
+        user: prev.user?.id === userId ? mergeStableUserState(user, prev.user) : prev.user,
       }));
     } catch (error) {
       console.warn('Could not refresh current profile:', error);
@@ -463,7 +511,9 @@ export default function App() {
       .single();
 
     if (data) {
-      const mappedTraits = mapSupabaseTraits(data.traits || []);
+      const explicitTraits = await loadTraitsForProfileIds([data.id]);
+      const traits = data.traits?.length ? data.traits : (explicitTraits.get(data.id) || []);
+      const mappedTraits = mapSupabaseTraits(traits || []);
       const totalVotes = data.total_votes || mappedTraits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
 
       setSelectedFriend({ 
@@ -563,6 +613,18 @@ export default function App() {
     const displayName = formData.get('displayName') as string;
 
     try {
+      const { data: usernameMatch, error: usernameError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username)
+        .maybeSingle();
+
+      if (usernameError) throw usernameError;
+      if (usernameMatch) {
+        alert('That username is already taken. Try another one.');
+        return;
+      }
+
       let avatarUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${username}`;
 
       if (signupAvatarFile) {
@@ -606,7 +668,12 @@ export default function App() {
         setIsLoginView(true);
       }
     } catch (err: any) {
-      alert(err.message);
+      const message = String(err.message || '');
+      if (message.toLowerCase().includes('database error saving new user')) {
+        alert('Signup could not finish because the account profile could not be saved. Try a different username, or log in if this email was already used.');
+      } else {
+        alert(message || 'Failed to create account.');
+      }
     } finally {
       setLoading(false);
     }
@@ -1449,9 +1516,15 @@ export default function App() {
                       f.id === selectedFriend.id ? { ...f, hasVoted: true } : f
                     );
                     
+                    const freshUser = await loadCurrentUserProfile(authState.user.id);
                     setAuthState(prev => ({ 
                       ...prev, 
-                      user: prev.user ? { ...prev.user, friends: updatedFriends } : null 
+                      user: prev.user
+                        ? mergeStableUserState(
+                            freshUser || { ...prev.user, friends: updatedFriends },
+                            { ...prev.user, friends: updatedFriends }
+                          )
+                        : null 
                     }));
 
                     setCurrentScreen('home');
@@ -2674,7 +2747,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     ctx.fillText('VibeBatch', canvas.width / 2, 1640);
     ctx.fillStyle = textMuted;
     ctx.font = '700 24px Inter, Arial';
-    ctx.fillText('YOUR FRIENDS KNOW YOU BEST', canvas.width / 2, 1700);
+    ctx.fillText('YOUR PERSONA THROUGH A DIGITAL LENS.', canvas.width / 2, 1700);
 
     const link = document.createElement('a');
     link.download = `vibebatch-${user.username || 'story-card'}.png`;
@@ -2735,7 +2808,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
 
            <div className="mb-8 relative z-10 text-center space-y-2">
              <h1 className="text-2xl font-display font-bold text-gradient">VibeBatch</h1>
-             <p className="text-[9px] text-white/40 uppercase tracking-[0.4em] font-bold">Your friends know you best</p>
+             <p className="text-[9px] text-white/40 uppercase tracking-[0.28em] font-bold">Your Persona through a Digital Lens.</p>
            </div>
         </div>
       </div>
