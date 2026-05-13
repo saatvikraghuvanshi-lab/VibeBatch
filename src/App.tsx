@@ -372,7 +372,12 @@ export default function App() {
     if (rpcErrors.length === 0) return;
 
     console.warn('Trait vote RPC failed, trying direct trait write:', rpcErrors);
-    await Promise.all(traitNames.map(traitName => incrementTraitDirectly(targetUserId, traitName)));
+    try {
+      await Promise.all(traitNames.map(traitName => incrementTraitDirectly(targetUserId, traitName)));
+    } catch (fallbackError) {
+      console.error('Direct trait write failed:', fallbackError);
+      throw new Error(rpcErrors.map((error: any) => error.message).join('\n') || 'Trait vote could not be recorded.');
+    }
   };
 
   const refreshFriends = async (userId: string) => {
@@ -1575,13 +1580,6 @@ export default function App() {
                   try {
                     await submitTraitVotes(selectedFriend.id, traits);
 
-                    const targetTraitMap = await loadTraitsForProfileIds([selectedFriend.id]);
-                    const targetProfileTraits = targetTraitMap.get(selectedFriend.id) || [];
-                    const targetMappedTraits = mapSupabaseTraits(targetProfileTraits);
-                    if (!hasRecordedTraitVotes({ traits: targetMappedTraits })) {
-                      throw new Error('Trait vote was not saved. Please try again.');
-                    }
-
                     const { error: voteStateError } = await supabase
                       .from('friendships')
                       .update({ has_voted: true })
@@ -1607,9 +1605,9 @@ export default function App() {
                     }));
 
                     setCurrentScreen('home');
-                  } catch (err) {
+                  } catch (err: any) {
                     console.error(err);
-                    alert("Failed to send vibes.");
+                    throw err;
                   } finally {
                     setLoading(false);
                   }
@@ -2198,6 +2196,7 @@ function VotingScreen({ friend, onBack, onVote }: any) {
   const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
   const [isCaptchadone, setIsCaptchaDone] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const traits = PREDEFINED_TRAITS.map(t => t.name!);
 
@@ -2207,12 +2206,17 @@ function VotingScreen({ friend, onBack, onVote }: any) {
     );
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!isCaptchadone) return;
-    setSubmitted(true);
-    setTimeout(() => {
-      onVote(selectedTraits);
-    }, 2000);
+    setSubmitting(true);
+    try {
+      await onVote(selectedTraits);
+      setSubmitted(true);
+    } catch (error: any) {
+      alert(error.message || 'Failed to send vibes.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -2275,8 +2279,8 @@ function VotingScreen({ friend, onBack, onVote }: any) {
            <p className="text-xs text-white/60 italic leading-relaxed">Each person can only vote once. Votes are intentional and non-reversible.</p>
         </div>
 
-        <Button onClick={submit} disabled={selectedTraits.length === 0 || !isCaptchadone} variant="primary">
-          Submit vote →
+        <Button onClick={submit} disabled={selectedTraits.length === 0 || !isCaptchadone || submitting} variant="primary">
+          {submitting ? 'Sending vibes...' : 'Submit vote →'}
         </Button>
       </div>
     </div>
