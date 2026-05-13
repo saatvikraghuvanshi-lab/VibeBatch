@@ -984,7 +984,7 @@ export default function App() {
         <header className="flex justify-between items-start xl:items-center mb-5 lg:mb-8 max-w-7xl mx-auto w-full min-w-0 gap-4">
           <div className="min-w-0 flex-1 pr-2">
             <h1 className="text-4xl sm:text-5xl lg:text-4xl font-display font-extrabold text-gradient leading-none truncate">VibeBatch</h1>
-            <p className="mt-2 max-w-[220px] sm:max-w-none text-[11px] lg:text-xs text-accent font-bold tracking-[0.18em] uppercase leading-relaxed">Your persona in chrome, glow, and receipts.</p>
+            <p className="mt-2 max-w-[220px] sm:max-w-none text-[11px] lg:text-xs text-accent font-bold tracking-[0.18em] uppercase leading-relaxed">Your Persona through a Digital Lens.</p>
           </div>
           
           <div className="flex items-center gap-3 shrink-0">
