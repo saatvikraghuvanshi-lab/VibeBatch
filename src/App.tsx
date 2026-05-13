@@ -162,6 +162,16 @@ const mergeStableUserState = (freshUser: UserProfile, previousUser?: UserProfile
 const hasRecordedTraitVotes = (profile?: { traits?: Trait[]; totalVotes?: number } | null) => (
   getTraitVoteTotal(profile?.traits || [], profile?.totalVotes || 0) > 0
 );
+const getConfirmedVoteKey = (userId?: string, friendId?: string) => (
+  userId && friendId ? `vibebatch_confirmed_trait_vote_${userId}_${friendId}` : ''
+);
+const hasLocalConfirmedVote = (userId?: string, friendId?: string) => {
+  const key = getConfirmedVoteKey(userId, friendId);
+  return Boolean(key && window.localStorage.getItem(key));
+};
+const markLocalConfirmedVote = (userId: string, friendId: string) => {
+  window.localStorage.setItem(getConfirmedVoteKey(userId, friendId), new Date().toISOString());
+};
 
 const mapSupabaseTraits = (rows: any[] = []) => {
   const mapped = PREDEFINED_TRAITS.map(pt => {
@@ -217,7 +227,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   displayName: profile.display_name || profile.username || 'New friend',
   avatar: profile.avatar_url || '',
   friendshipDate: link?.created_at || new Date().toISOString(),
-  hasVoted: Boolean(link?.has_voted) && hasRecordedTraitVotes({ traits, totalVotes }),
+  hasVoted: hasLocalConfirmedVote(link?.user_id, profile.id),
   relationshipLength,
   friendRelationshipLength,
   isVoteEligible,
@@ -368,7 +378,7 @@ export default function App() {
   const refreshFriends = async (userId: string) => {
     const { data: links, error: linksError } = await supabase
       .from('friendships')
-      .select('friend_id, relationship_length, has_voted, created_at')
+      .select('user_id, friend_id, relationship_length, has_voted, created_at')
       .eq('user_id', userId);
 
     if (linksError) throw linksError;
@@ -1579,6 +1589,7 @@ export default function App() {
                       .eq('friend_id', selectedFriend.id);
 
                     if (voteStateError) throw voteStateError;
+                    markLocalConfirmedVote(authState.user.id, selectedFriend.id);
 
                     const updatedFriends = authState.user.friends.map(f => 
                       f.id === selectedFriend.id ? { ...f, hasVoted: true } : f
