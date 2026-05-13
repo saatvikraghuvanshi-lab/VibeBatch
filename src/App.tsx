@@ -2359,7 +2359,7 @@ function StatCard({ label, value }: any) {
 }
 
 function VotingScreen({ friend, onBack, onVote }: any) {
-  const [selectedTraits, setSelectedTraits] = useState<string[]>([]);
+  const [selectedTrait, setSelectedTrait] = useState('');
   const [isCaptchadone, setIsCaptchaDone] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2371,16 +2371,14 @@ function VotingScreen({ friend, onBack, onVote }: any) {
   const traits = [...new Set([...PREDEFINED_TRAITS.map(t => t.name!), ...customTraitNames])];
 
   const toggleTrait = (name: string) => {
-    setSelectedTraits(prev => 
-      prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]
-    );
+    setSelectedTrait(prev => prev === name ? '' : name);
   };
 
   const submit = async () => {
     if (!isCaptchadone) return;
     setSubmitting(true);
     try {
-      await onVote(selectedTraits);
+      await onVote([selectedTrait]);
       setSubmitted(true);
     } catch (error: any) {
       alert(error.message || 'Failed to send vibes.');
@@ -2409,7 +2407,7 @@ function VotingScreen({ friend, onBack, onVote }: any) {
         <button onClick={onBack}><ChevronLeft /></button>
         <div className="text-center">
             <h2 className="text-lg font-bold font-display">Voting for {friend.displayName}</h2>
-            <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Select their strongest traits</p>
+            <p className="text-[10px] text-white/40 uppercase font-bold tracking-widest">Select their strongest trait</p>
         </div>
         <div className="w-6"></div>
       </div>
@@ -2420,7 +2418,7 @@ function VotingScreen({ friend, onBack, onVote }: any) {
             <button 
               key={trait}
               onClick={() => toggleTrait(trait)}
-              className={`p-4 card-surface font-bold text-sm transition-all text-center ${selectedTraits.includes(trait) ? 'bg-accent/20 border-accent text-accent glowing-accent' : 'hover:border-white/20'}`}
+              className={`p-4 card-surface font-bold text-sm transition-all text-center ${selectedTrait === trait ? 'bg-accent/20 border-accent text-accent glowing-accent' : 'hover:border-white/20'}`}
             >
               {trait}
             </button>
@@ -2449,7 +2447,7 @@ function VotingScreen({ friend, onBack, onVote }: any) {
            <p className="text-xs text-white/60 italic leading-relaxed">Each person can only vote once. Votes are intentional and non-reversible.</p>
         </div>
 
-        <Button onClick={submit} disabled={selectedTraits.length === 0 || !isCaptchadone || submitting} variant="primary">
+        <Button onClick={submit} disabled={!selectedTrait || !isCaptchadone || submitting} variant="primary">
           {submitting ? 'Sending vibes...' : 'Submit vote →'}
         </Button>
       </div>
@@ -3083,4 +3081,3 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     </div>
   );
 }
-
