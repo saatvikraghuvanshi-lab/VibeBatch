@@ -3094,7 +3094,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
   const votedFriends = user.friends.filter(friend => friend.hasVoted);
   const hints = votedFriends.slice(0, 6).map((friend, index) => ({
     id: friend.id,
-    friend: friend.displayName,
+    duration: getFriendshipLengthLabel(friend.relationshipLength),
     trait: topTraits[index % Math.max(topTraits.length, 1)]?.name || 'Emerging trait',
   }));
 
@@ -3219,7 +3219,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
             <div key={`${hint.id}-${index}`} className="flex items-center justify-between gap-4 bg-background/40 border border-accent/15 rounded-xl p-3">
               <div className="min-w-0">
                 <p className="text-xs text-white/40 font-bold uppercase tracking-widest">Anonymous friend signal</p>
-                <p className="font-bold truncate">{hint.friend}</p>
+                <p className="font-bold truncate">{hint.duration}</p>
               </div>
               <Badge color="accent">{hint.trait}</Badge>
             </div>
