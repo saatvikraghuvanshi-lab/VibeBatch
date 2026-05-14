@@ -1510,7 +1510,7 @@ export default function App() {
               <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
               <NavItem icon={<Hourglass size={20} />} active={currentScreen === 'hourglass'} onClick={() => setCurrentScreen('hourglass')} />
               <NavItem icon={<BarChart3 size={20} />} active={currentScreen === 'tracker'} onClick={() => setCurrentScreen('tracker')} />
-              {isPremiumUser(user) && <NavItem icon={<Crown size={20} />} active={currentScreen === 'premium'} onClick={() => setCurrentScreen('premium')} />}
+              <NavItem icon={<Crown size={20} />} active={currentScreen === 'premium'} onClick={() => setCurrentScreen('premium')} />
             </div>
           </div>
         </header>
@@ -1745,7 +1745,7 @@ export default function App() {
       { label: 'Traits', description: 'View your anonymous trait breakdown', icon: <Sparkles size={22} />, screen: 'traits' },
       { label: 'Eligibility', description: 'Check who can vote for your traits', icon: <Hourglass size={22} />, screen: 'hourglass' },
       { label: 'Vote Tracker', description: 'Track eligible, voted, and locked friends', icon: <BarChart3 size={22} />, screen: 'tracker' },
-      ...(isPremiumUser(user) ? [{ label: 'VibeBatch Premium', description: 'Premium insight cards and story cards', icon: <Crown size={22} />, screen: 'premium' }] : []),
+      { label: 'VibeBatch Premium', description: isPremiumUser(user) ? 'Premium insight cards and personality cards' : 'Plans, pricing, and premium features', icon: <Crown size={22} />, screen: 'premium' },
     ];
 
     return (
@@ -1858,7 +1858,7 @@ export default function App() {
             />
           )}
 
-          {currentScreen === 'premium' && authState.user && isPremiumUser(authState.user) && (
+          {currentScreen === 'premium' && authState.user && (
             <PremiumScreen user={authState.user} onBack={() => setCurrentScreen('home')} />
           )}
           
@@ -2284,6 +2284,9 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onOpenInvite, onUpda
 function TraitsScreen({ onBack, user }: any) {
   const sortedTraits = [...user.traits].sort((a, b) => b.votes - a.votes);
   const votedTraits = getPositiveTraits(user.traits);
+  const customTraits = sortedTraits.filter(t => t.category === 'custom' && t.votes === 0);
+  const unvotedPredefinedTraits = sortedTraits.filter(t => t.category === 'predefined' && t.votes === 0);
+  const unvotedSponsoredTraits = sortedTraits.filter(t => t.category === 'sponsored' && t.votes === 0);
   const top3 = votedTraits.slice(0, 3);
   const effectiveTotalVotes = getTraitVoteTotal(user.traits, user.totalVotes);
   
@@ -2322,9 +2325,9 @@ function TraitsScreen({ onBack, user }: any) {
 
       <div className="space-y-6">
         <TraitCategory label="Voted Traits" traits={votedTraits} total={effectiveTotalVotes} />
-        <TraitCategory label="Predefined Traits" traits={sortedTraits.filter(t => t.category === 'predefined' && t.votes === 0)} total={effectiveTotalVotes} />
-        <TraitCategory label="Sponsored Traits" traits={sortedTraits.filter(t => t.category === 'sponsored' && t.votes === 0)} total={effectiveTotalVotes} sponsored />
-        <TraitCategory label="Custom Traits" traits={sortedTraits.filter(t => t.category === 'custom' && t.votes === 0)} total={effectiveTotalVotes} custom />
+        <TraitCategory label="Custom Traits" traits={customTraits} total={effectiveTotalVotes} custom />
+        <TraitCategory label="Predefined Traits" traits={unvotedPredefinedTraits} total={effectiveTotalVotes} />
+        <TraitCategory label="Sponsored Traits" traits={unvotedSponsoredTraits} total={effectiveTotalVotes} sponsored />
       </div>
     </div>
   );
@@ -3171,12 +3174,13 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
   ctx.fillText('YOUR PERSONA THROUGH A DIGITAL LENS.', canvas.width / 2, 1786);
 
   const link = document.createElement('a');
-  link.download = `vibebatch-premium-${user.username || 'story-card'}.png`;
+  link.download = `vibebatch-premium-${user.username || 'personality-card'}.png`;
   link.href = canvas.toDataURL('image/png');
   link.click();
 };
 
 function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
+  const premium = isPremiumUser(user);
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
   const [description, setDescription] = useState(buildLocalPersonalityDescription(user.traits));
   const votedFriends = user.friends.filter(friend => friend.hasVoted);
@@ -3184,6 +3188,9 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
     id: friend.id,
     duration: getFriendshipLengthLabel(friend.relationshipLength),
     trait: topTraits[index % Math.max(topTraits.length, 1)]?.name || 'Emerging trait',
+    sharedTrait: getPositiveTraits(friend.traits || [])
+      .slice(0, 3)
+      .find(friendTrait => topTraits.some(userTrait => normalizeTraitName(userTrait.name) === normalizeTraitName(friendTrait.name)))?.name || '',
   }));
 
   useEffect(() => {
@@ -3201,114 +3208,52 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
     };
   }, [user.id, user.traits]);
 
-  const downloadPersonalityCard = async () => {
-    const traitNames = topTraits.length
-      ? topTraits.map(trait => trait.name)
-      : ['Vibe still forming', 'More votes loading', 'Trait signals pending'];
-    const canvas = document.createElement('canvas');
-    canvas.width = 1080;
-    canvas.height = 1920;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.fillStyle = '#1E1231';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    const glow = ctx.createRadialGradient(540, 0, 40, 540, 0, 1160);
-    glow.addColorStop(0, 'rgba(233,137,208,0.34)');
-    glow.addColorStop(0.5, 'rgba(220,199,255,0.20)');
-    glow.addColorStop(1, 'rgba(30,18,49,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.strokeStyle = 'rgba(220,199,255,0.24)';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(54, 54, 972, 1812, 72);
-    ctx.stroke();
-
-    ctx.fillStyle = '#DCC7FF';
-    ctx.font = '900 30px Inter, Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('VIBEBATCH PREMIUM', canvas.width / 2, 165);
-
-    const avatarX = canvas.width / 2;
-    if (user.avatar) {
-      try {
-        const avatar = await loadCanvasImage(user.avatar);
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(avatarX, 335, 116, 0, Math.PI * 2);
-        ctx.clip();
-        drawCoverImage(ctx, avatar, avatarX - 116, 219, 232, 232);
-        ctx.restore();
-      } catch {
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.beginPath();
-        ctx.arc(avatarX, 335, 116, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    ctx.strokeStyle = '#DCC7FF';
-    ctx.lineWidth = 9;
-    ctx.beginPath();
-    ctx.arc(avatarX, 335, 122, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = '#FFFFFF';
-    const displayHandle = user.username ? `@${user.username}` : user.displayName;
-    setFittedCanvasFont(ctx, displayHandle, 900, 62, 40, '900');
-    ctx.fillText(displayHandle, canvas.width / 2, 565, 900);
-
-    ctx.fillStyle = '#F5D7FF';
-    const title = user.identityTitle || 'Identity Locked';
-    setFittedCanvasFont(ctx, title, 760, 32, 23, '900');
-    ctx.fillText(title, canvas.width / 2, 635, 760);
-
-    ctx.fillStyle = '#DCC7FF';
-    ctx.font = '900 28px Inter, Arial';
-    ctx.fillText('YOUR VIBE', canvas.width / 2, 790);
-
-    ctx.fillStyle = 'rgba(255,255,255,0.86)';
-    ctx.font = '700 34px Inter, Arial';
-    wrapCanvasText(ctx, description, canvas.width / 2, 860, 800, 50);
-
-    traitNames.slice(0, 3).forEach((traitName, index) => {
-      const y = 1220 + index * 128;
-      ctx.fillStyle = 'rgba(22,11,37,0.96)';
-      ctx.beginPath();
-      ctx.roundRect(110, y, 860, 96, 24);
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(220,199,255,0.72)';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-      ctx.textAlign = 'left';
-      ctx.fillStyle = '#DCC7FF';
-      ctx.font = '900 26px Inter, Arial';
-      ctx.fillText(`#${index + 1}`, 160, y + 60);
-      ctx.fillStyle = '#FFFFFF';
-      setFittedCanvasFont(ctx, traitName, 640, 32, 24, '900');
-      ctx.fillText(traitName, 290, y + 61, 640);
-    });
-
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 56px Inter, Arial';
-    ctx.fillText('VibeBatch', canvas.width / 2, 1728);
-    ctx.fillStyle = 'rgba(220,199,255,0.82)';
-    ctx.font = '900 20px Inter, Arial';
-    ctx.fillText('YOUR PERSONA THROUGH A DIGITAL LENS.', canvas.width / 2, 1786);
-
-    const link = document.createElement('a');
-    link.download = `vibebatch-premium-${user.username || 'personality'}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  };
-
   const downloadPremiumStoryCard = async () => {
     await downloadPremiumStoryCardPng(user, description);
   };
+
+  if (!premium) {
+    return (
+      <div className="min-h-screen p-4 pb-24 max-w-3xl mx-auto w-full">
+        <div className="flex items-center gap-4 mb-6">
+          <button onClick={onBack}><ChevronLeft /></button>
+          <div>
+            <h2 className="text-xl font-bold font-display flex items-center gap-2"><Crown size={20} /> VibeBatch Premium</h2>
+            <p className="text-xs text-accent font-bold uppercase tracking-[0.18em] mt-1">Unlock private insight tools</p>
+          </div>
+        </div>
+
+        <section className="card-surface p-6 mb-6">
+          <p className="text-xs text-accent font-black uppercase tracking-[0.2em] mb-3">Monthly Pass</p>
+          <div className="flex items-end gap-2 mb-5">
+            <span className="text-5xl font-black font-display">₹199</span>
+            <span className="text-white/45 font-bold mb-2">/ month</span>
+          </div>
+          <Button onClick={() => alert('Payments are coming soon.')} className="flex items-center justify-center gap-2">
+            <Crown size={18} /> Buy VibeBatch Premium
+          </Button>
+        </section>
+
+        <section className="card-surface p-6">
+          <h3 className="text-sm font-black uppercase tracking-widest text-white/55 mb-4">What Premium Includes</h3>
+          <div className="space-y-3">
+            {[
+              'Anonymous hints about which friend signal connects to each trait.',
+              'Shared top-trait clues when you and a friend have a top trait in common.',
+              'AI-made personality insight based on your voted traits.',
+              'Premium personality card with visual backgrounds and stacked top traits.',
+              'Downloadable premium card for sharing outside VibeBatch.',
+            ].map(feature => (
+              <div key={feature} className="flex items-start gap-3 rounded-xl bg-background/40 border border-accent/15 p-3">
+                <Sparkles size={16} className="text-accent shrink-0 mt-0.5" />
+                <p className="text-sm text-white/75 leading-relaxed">{feature}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
@@ -3320,44 +3265,6 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
         </div>
       </div>
 
-      <section className="mb-8">
-        <div className="mx-auto w-full max-w-[340px] aspect-[9/16] rounded-[28px] border border-accent/25 bg-[radial-gradient(circle_at_50%_0%,rgba(233,137,208,0.24),transparent_42%),linear-gradient(180deg,#2A183C_0%,#1E1231_58%,#160B25_100%)] p-5 flex flex-col shadow-2xl shadow-black/25 overflow-hidden">
-          <p className="text-center text-[10px] font-black tracking-widest text-accent uppercase mb-5">VibeBatch Premium</p>
-          {user.avatar ? (
-            <img src={user.avatar} className="mx-auto w-20 h-20 rounded-full object-cover border-4 border-accent mb-4" alt="" />
-          ) : (
-            <div className="mx-auto w-20 h-20 rounded-full bg-surface border border-accent/30 flex items-center justify-center mb-4">
-              <Crown size={24} />
-            </div>
-          )}
-          <div className="text-center space-y-2 min-w-0">
-            <p className="text-[clamp(1.15rem,6vw,1.55rem)] leading-tight font-black font-display break-words">{user.username ? `@${user.username}` : user.displayName}</p>
-            <p className="text-xs font-bold text-accent truncate">{user.identityTitle || 'Identity Locked'}</p>
-          </div>
-          <p className="text-[10px] font-black tracking-widest uppercase text-accent text-center mt-5">Your Vibe</p>
-          <p className="text-[12px] text-white/82 leading-relaxed text-center mt-2 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:5] [-webkit-box-orient:vertical]">{description}</p>
-          <div className="mt-auto space-y-2">
-            {(topTraits.length ? topTraits : [
-              { id: 'empty-1', name: 'Vibe still forming' },
-              { id: 'empty-2', name: 'More votes loading' },
-              { id: 'empty-3', name: 'Trait signals pending' },
-            ] as Trait[]).slice(0, 3).map((trait, index) => (
-              <div key={trait.id || trait.name} className="flex items-center gap-4 rounded-xl bg-background/75 border border-accent/50 px-4 py-2.5 shadow-lg shadow-black/10">
-                <span className="text-[10px] font-black text-accent w-8">#{index + 1}</span>
-                <span className="text-[11px] font-black text-white truncate">{trait.name}</span>
-              </div>
-            ))}
-          </div>
-          <div className="text-center pt-4">
-            <p className="text-xl font-black font-display">VibeBatch</p>
-            <p className="text-[8px] text-white/45 uppercase tracking-[0.22em] font-bold mt-1">Your Persona through a Digital Lens.</p>
-          </div>
-        </div>
-        <Button onClick={downloadPersonalityCard} className="mt-4 max-w-sm mx-auto flex items-center justify-center gap-2">
-          <Download size={18} /> Download Personality Card
-        </Button>
-      </section>
-
       <section className="card-surface p-5 mb-8">
         <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Anonymous Trait Hints</h3>
         <div className="space-y-3">
@@ -3366,6 +3273,9 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
               <div className="min-w-0">
                 <p className="text-xs text-white/40 font-bold uppercase tracking-widest">Anonymous friend signal</p>
                 <p className="font-bold truncate">{hint.duration}</p>
+                {hint.sharedTrait && (
+                  <p className="text-xs text-accent/80 font-bold mt-1">Shared top trait: {hint.sharedTrait}</p>
+                )}
               </div>
               <Badge color="accent">{hint.trait}</Badge>
             </div>
@@ -3376,6 +3286,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
       </section>
 
       <section>
+        <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Personality Card</h3>
         <div
           className="mx-auto w-full max-w-[340px] aspect-[9/16] rounded-[28px] border border-accent/25 p-5 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
           style={{
@@ -3411,7 +3322,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
           </div>
         </div>
         <Button onClick={downloadPremiumStoryCard} variant="secondary" className="mt-4 max-w-sm mx-auto flex items-center justify-center gap-2">
-          <Download size={18} /> Download Premium Story Card
+          <Download size={18} /> Download Personality Card
         </Button>
       </section>
     </div>
@@ -3623,7 +3534,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
   const downloadPremiumAnimatedStoryCard = async () => {
     const premium = isPremiumUser(user);
     if (!premium) {
-      alert('Premium story cards are available for VibeBatch Premium users.');
+      alert('Premium personality cards are available for VibeBatch Premium users.');
       return;
     }
 
@@ -3700,7 +3611,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
            <Download size={20} /> Download (Free)
         </Button>
         <button onClick={downloadPremiumAnimatedStoryCard} className="w-full p-4 rounded-xl border border-accent/30 text-accent font-bold text-sm flex items-center justify-center gap-2 bg-accent/5">
-           <Download size={18} /> Download Premium Story Card
+           <Download size={18} /> Download Premium Personality Card
            <Badge color="accent" className="ml-2 scale-75">Premium</Badge>
         </button>
       </div>
