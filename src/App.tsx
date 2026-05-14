@@ -297,7 +297,7 @@ export default function App() {
         return;
       }
 
-      alert('Password updated. Please log in with your new password.');
+      alert('New password set. Please log in again.');
       await supabase.auth.signOut();
       setAuthState({ user: null, isAuthenticated: false });
       setCurrentScreen('login');
@@ -1096,20 +1096,28 @@ export default function App() {
     setIsProfileSheetOpen(false);
   };
 
-  const resetPassword = async (emailOverride?: string) => {
-    const email = emailOverride || window.prompt('Enter the email for your VibeBatch account');
-    if (!email?.trim()) return;
+  const resetPassword = async () => {
+    const newPassword = window.prompt('Enter your new VibeBatch password');
+    if (!newPassword) return;
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: window.location.origin,
-      });
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError || !authData.user) {
+        alert('Please log in again before changing your password.');
+        return;
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
 
       if (error) throw error;
-      alert('Password reset email sent. Check your inbox.');
+      alert('New password set. Please log in again.');
+      await supabase.auth.signOut();
+      setAuthState({ user: null, isAuthenticated: false });
+      setCurrentScreen('login');
+      setIsProfileSheetOpen(false);
     } catch (err: any) {
-      alert(err.message || 'Failed to send password reset email.');
+      alert(err.message || 'Failed to reset password.');
     } finally {
       setLoading(false);
     }
@@ -1127,7 +1135,8 @@ export default function App() {
         return;
       }
 
-      const generatedTitle = await generateIdentityTitle(traits);
+      const titleTraits = votedTraits.slice(0, 3);
+      const generatedTitle = await generateIdentityTitle(titleTraits);
       const title = generatedTitle === 'The Magnetic Storyteller'
         ? buildIdentityTitleFromTraits(traits)
         : generatedTitle;
@@ -1166,15 +1175,24 @@ export default function App() {
 
     setLoading(true);
     try {
+      const traitRow = {
+        user_id: authState.user.id,
+        trait_id: cleanName,
+        votes_count: 0,
+      };
       const { error } = await supabase
         .from('traits')
-        .upsert([{
-          user_id: authState.user.id,
-          trait_id: cleanName,
-          votes_count: 0,
-        }], { onConflict: 'user_id,trait_id' });
+        .upsert([traitRow], { onConflict: 'user_id,trait_id' });
 
-      if (error) throw error;
+      if (error) {
+        const { error: insertError } = await supabase
+          .from('traits')
+          .insert([traitRow]);
+
+        if (insertError && !insertError.message.toLowerCase().includes('duplicate')) {
+          throw insertError;
+        }
+      }
 
       const freshUser = await loadCurrentUserProfile(authState.user.id);
       if (freshUser) {
@@ -1298,7 +1316,7 @@ export default function App() {
               <input name="username" type="text" placeholder="Username" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
               <input name="email" type="email" placeholder="Email" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
               <input name="password" type="password" placeholder="Password" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" required />
-              <input name="contact" type="tel" placeholder="Contact Number" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" />
+              <input name="contact" type="tel" placeholder="Contact Number (optional)" className="w-full bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-accent/50 transition-colors" />
             </div>
             <Button type="submit" disabled={loading}>
               {loading ? "Creating account..." : "Sign up →"}
@@ -2886,7 +2904,6 @@ function PublicProfileScreen({ user, onBack, onVote }: any) {
 
 function StoryCardGeneratorScreen({ user, onBack }: any) {
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
-  const effectiveTotalVotes = getTraitVoteTotal(user.traits, user.totalVotes);
   const hasVotes = topTraits.length > 0;
 
   const downloadStoryCard = async () => {
@@ -2897,11 +2914,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     if (!ctx) return;
 
     const background = '#1E1231';
-    const surface = '#2B1A3D';
     const accent = '#DCC7FF';
-    const pink = '#E989D0';
-    const violet = '#7463D8';
-    const textMuted = 'rgba(255,255,255,0.52)';
 
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2922,7 +2935,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '700 72px Inter, Arial';
-    ctx.fillText(user.displayName || 'Your Name', canvas.width / 2, 680);
+    ctx.fillText(user.username ? `@${user.username}` : (user.displayName || 'Your Name'), canvas.width / 2, 680);
 
     const title = user.identityTitle || 'IDENTITY LOCKED';
     ctx.font = '900 24px Inter, Arial';
@@ -2970,7 +2983,6 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
 
     if (hasVotes) topTraits.forEach((trait, index) => {
       const y = 890 + index * 154;
-      const percent = Math.round(((trait.votes || 0) / Math.max(effectiveTotalVotes, 1)) * 100);
       const traitGradient = ctx.createLinearGradient(170, y, 910, y + 124);
       traitGradient.addColorStop(0, index === 0 ? 'rgba(233,137,208,0.22)' : 'rgba(220,199,255,0.13)');
       traitGradient.addColorStop(1, 'rgba(43,26,61,0.76)');
@@ -2986,11 +2998,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       ctx.fillText(`#${index + 1}`, 206, y + 74);
       ctx.fillStyle = '#FFFFFF';
       ctx.font = '800 34px Inter, Arial';
-      ctx.fillText(trait.name || 'Trait', 300, y + 76, 430);
-      ctx.fillStyle = '#F5D7FF';
-      ctx.font = '900 36px Inter, Arial';
-      ctx.textAlign = 'right';
-      ctx.fillText(`${percent}%`, 862, y + 76);
+      ctx.fillText(trait.name || 'Trait', 300, y + 76, 560);
       ctx.textAlign = 'center';
     });
 
@@ -3009,17 +3017,6 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       ctx.roundRect(320, y + 58, 360, 12, 6);
       ctx.fill();
     });
-
-    const brandGradient = ctx.createLinearGradient(360, 0, 720, 0);
-    brandGradient.addColorStop(0, '#FFFFFF');
-    brandGradient.addColorStop(0.55, '#F5F1FA');
-    brandGradient.addColorStop(1, violet);
-    ctx.fillStyle = brandGradient;
-    ctx.font = '900 76px Inter, Arial';
-    ctx.fillText('VibeBatch', canvas.width / 2, 1640);
-    ctx.fillStyle = textMuted;
-    ctx.font = '700 24px Inter, Arial';
-    ctx.fillText('YOUR PERSONA THROUGH A DIGITAL LENS.', canvas.width / 2, 1700);
 
     const link = document.createElement('a');
     link.download = `vibebatch-${user.username || 'story-card'}.png`;
@@ -3048,7 +3045,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
                </div>
              )}
              <div className="text-center space-y-3">
-               <h3 className="text-2xl font-bold font-display tracking-tight">{user.displayName || "Your Name"}</h3>
+               <h3 className="text-2xl font-bold font-display tracking-tight">{user.username ? `@${user.username}` : (user.displayName || "Your Name")}</h3>
                {user.identityTitle ? (
                  <div className="inline-block gradient-button !py-1.5 !px-4 text-[9px] font-black uppercase tracking-[0.1em]">
                    {user.identityTitle}
@@ -3065,7 +3062,6 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
                  <div key={t.id} className="bg-surface/70 backdrop-blur-md border border-accent/25 rounded-xl p-3 flex items-center gap-3 min-w-0 shadow-lg shadow-black/10">
                     <span className="text-[10px] font-black text-accent uppercase tracking-tighter w-8 shrink-0">#{i+1}</span>
                     <span className="text-[11px] font-bold text-white truncate flex-1">{t.name}</span>
-                    <span className="text-[11px] font-black text-accent">{Math.round(((t.votes || 0) / Math.max(effectiveTotalVotes, 1)) * 100)}%</span>
                  </div>
                )) : (
                  [1,2,3].map(i => (
@@ -3077,11 +3073,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
                )}
              </div>
            </div>
-
-           <div className="mb-8 relative z-10 text-center space-y-2">
-             <h1 className="text-2xl font-display font-bold text-gradient">VibeBatch</h1>
-             <p className="text-[9px] text-white/40 uppercase tracking-[0.28em] font-bold">Your Persona through a Digital Lens.</p>
-           </div>
+           <div className="h-8 relative z-10" />
         </div>
       </div>
 

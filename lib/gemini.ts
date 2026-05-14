@@ -11,8 +11,8 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 export async function generateIdentityTitle(traits: Trait[]): Promise<string> {
   const topTraits = [...traits]
     .sort((a, b) => b.votes - a.votes)
-    .slice(0, 5)
     .filter(t => t.votes > 0)
+    .slice(0, 3)
     .map(t => t.name)
     .join(", ");
 
