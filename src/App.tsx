@@ -2932,14 +2932,36 @@ const buildLocalPersonalityDescription = (traits: Trait[] = []) => {
   return `Your presence blends ${names.join(', ')} into a profile that feels distinct and memorable. People seem to experience you as someone with a clear signature: expressive, intentional, and easy to recognize in a room.`;
 };
 
+const getTraitscapeStyle = (traits: Trait[] = []) => {
+  const names = getPositiveTraits(traits).slice(0, 3).map(trait => normalizeTraitName(trait.name)).join(' ');
+  const warm = names.includes('warm') || names.includes('caring') || names.includes('empathetic') || names.includes('supportive');
+  const bold = names.includes('leader') || names.includes('bold') || names.includes('confident') || names.includes('ambition');
+  const calm = names.includes('calm') || names.includes('zen') || names.includes('stable') || names.includes('grounded');
+
+  if (warm) {
+    return 'radial-gradient(circle at 20% 18%, rgba(233,137,208,.28), transparent 30%), radial-gradient(circle at 82% 34%, rgba(246,211,139,.16), transparent 28%), radial-gradient(circle at 50% 96%, rgba(220,199,255,.20), transparent 36%), linear-gradient(180deg, #2A183C 0%, #1E1231 58%, #160B25 100%)';
+  }
+
+  if (bold) {
+    return 'linear-gradient(135deg, rgba(233,137,208,.20), transparent 30%), radial-gradient(circle at 86% 18%, rgba(116,99,216,.30), transparent 32%), radial-gradient(circle at 18% 86%, rgba(220,199,255,.18), transparent 34%), linear-gradient(180deg, #2A183C 0%, #1E1231 58%, #160B25 100%)';
+  }
+
+  if (calm) {
+    return 'radial-gradient(ellipse at 50% 8%, rgba(220,199,255,.22), transparent 35%), radial-gradient(circle at 18% 72%, rgba(98,225,236,.12), transparent 30%), radial-gradient(circle at 88% 82%, rgba(116,99,216,.18), transparent 34%), linear-gradient(180deg, #2A183C 0%, #1E1231 58%, #160B25 100%)';
+  }
+
+  return 'radial-gradient(circle at 50% 0%, rgba(233,137,208,.24), transparent 42%), radial-gradient(circle at 95% 86%, rgba(116,99,216,.22), transparent 38%), radial-gradient(circle at 12% 74%, rgba(220,199,255,.16), transparent 34%), linear-gradient(180deg, #2A183C 0%, #1E1231 58%, #160B25 100%)';
+};
+
 const createPremiumStoryHtml = (user: UserProfile, description: string) => {
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
   const avatar = escapeHtml(user.avatar || '');
   const username = escapeHtml(user.username ? `@${user.username}` : user.displayName);
   const title = escapeHtml(user.identityTitle || 'Identity Locked');
   const safeDescription = escapeHtml(description || buildLocalPersonalityDescription(user.traits));
+  const background = getTraitscapeStyle(user.traits);
   const traits = topTraits.map((trait, index) => `
-    <div class="trait trait-${index + 1}">
+    <div class="trait">
       <span>#${index + 1}</span>
       <strong>${escapeHtml(trait.name)}</strong>
     </div>
@@ -2968,17 +2990,24 @@ const createPremiumStoryHtml = (user: UserProfile, description: string) => {
     position: relative;
     overflow: hidden;
     border-radius: 34px;
-    padding: 56px 32px 40px;
-    background:
-      radial-gradient(circle at 50% 0%, rgba(233,137,208,.28), transparent 42%),
-      radial-gradient(circle at 95% 86%, rgba(116,99,216,.25), transparent 38%),
-      linear-gradient(180deg, #2A183C 0%, #1E1231 56%, #160B25 100%);
+    padding: 34px 32px 34px;
+    background: ${background};
     border: 1px solid rgba(220,199,255,.28);
     box-shadow: 0 28px 70px rgba(0,0,0,.45);
   }
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(120deg, transparent 0 24%, rgba(255,255,255,.055) 31%, transparent 39%),
+      repeating-linear-gradient(120deg, rgba(255,255,255,.018) 0 1px, transparent 1px 16px);
+    opacity: .65;
+    pointer-events: none;
+  }
   .premium {
     position: absolute;
-    top: 26px;
+    top: 22px;
     right: 26px;
     padding: 8px 12px;
     border-radius: 999px;
@@ -2995,23 +3024,27 @@ const createPremiumStoryHtml = (user: UserProfile, description: string) => {
     border-radius: 999px;
     object-fit: cover;
     display: block;
-    margin: 46px auto 26px;
+    margin: 38px auto 20px;
     border: 4px solid #DCC7FF;
-    animation: avatarIn 900ms cubic-bezier(.2,.8,.2,1) both;
+    position: relative;
+    z-index: 1;
   }
   .avatarFallback {
     width: 132px;
     height: 132px;
     border-radius: 999px;
-    margin: 46px auto 26px;
+    margin: 38px auto 20px;
     border: 4px solid #DCC7FF;
     background: rgba(255,255,255,.08);
-    animation: avatarIn 900ms cubic-bezier(.2,.8,.2,1) both;
+    position: relative;
+    z-index: 1;
   }
   h1 {
     margin: 0;
     text-align: center;
     font-size: 28px;
+    position: relative;
+    z-index: 1;
   }
   .title {
     width: fit-content;
@@ -3025,19 +3058,34 @@ const createPremiumStoryHtml = (user: UserProfile, description: string) => {
     font-weight: 900;
     letter-spacing: .12em;
     text-transform: uppercase;
-    animation: riseIn 700ms 850ms both;
+    position: relative;
+    z-index: 1;
+  }
+  .vibeLabel {
+    margin: 26px 0 8px;
+    color: #DCC7FF;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    text-align: center;
+    position: relative;
+    z-index: 1;
   }
   .description {
-    margin: 28px 0 20px;
-    color: rgba(255,255,255,.76);
+    margin: 0 0 20px;
+    color: rgba(255,255,255,.82);
     font-size: 13px;
     line-height: 1.55;
     text-align: center;
-    animation: riseIn 750ms 1450ms both;
+    position: relative;
+    z-index: 1;
   }
   .traits {
     display: grid;
     gap: 10px;
+    position: relative;
+    z-index: 1;
   }
   .trait {
     display: flex;
@@ -3045,11 +3093,9 @@ const createPremiumStoryHtml = (user: UserProfile, description: string) => {
     gap: 12px;
     padding: 13px 14px;
     border-radius: 14px;
-    background: rgba(43,26,61,.76);
-    border: 1px solid rgba(220,199,255,.25);
-    opacity: 0;
-    transform: translateY(16px);
-    animation: traitIn 520ms both;
+    background: rgba(43,26,61,.84);
+    border: 1px solid rgba(220,199,255,.34);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
   }
   .trait span {
     color: #DCC7FF;
@@ -3057,21 +3103,28 @@ const createPremiumStoryHtml = (user: UserProfile, description: string) => {
     font-weight: 900;
   }
   .trait strong {
+    color: rgba(255,255,255,.96);
     font-size: 13px;
   }
-  .trait-1 { animation-delay: 2100ms; }
-  .trait-2 { animation-delay: 2500ms; }
-  .trait-3 { animation-delay: 2900ms; }
-  @keyframes avatarIn {
-    from { opacity: 0; transform: translateX(120px) scale(.72); }
-    to { opacity: 1; transform: translateX(0) scale(1); }
+  .brand {
+    position: absolute;
+    left: 32px;
+    right: 32px;
+    bottom: 28px;
+    text-align: center;
+    z-index: 1;
   }
-  @keyframes riseIn {
-    from { opacity: 0; transform: translateY(18px); }
-    to { opacity: 1; transform: translateY(0); }
+  .brand strong {
+    display: block;
+    font-size: 22px;
+    margin-bottom: 8px;
   }
-  @keyframes traitIn {
-    to { opacity: 1; transform: translateY(0); }
+  .brand span {
+    color: rgba(255,255,255,.42);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: .22em;
+    text-transform: uppercase;
   }
 </style>
 </head>
@@ -3081,8 +3134,10 @@ const createPremiumStoryHtml = (user: UserProfile, description: string) => {
     ${avatar ? `<img class="avatar" src="${avatar}" alt="" />` : '<div class="avatarFallback"></div>'}
     <h1>${username}</h1>
     <div class="title">${title}</div>
+    <div class="vibeLabel">Your Vibe</div>
     <p class="description">${safeDescription}</p>
     <section class="traits">${traits}</section>
+    <div class="brand"><strong>VibeBatch</strong><span>Your Persona through a Digital Lens.</span></div>
   </main>
 </body>
 </html>`;
@@ -3149,10 +3204,10 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
 
     topTraits.forEach((trait, index) => {
       const y = 940 + index * 132;
-      ctx.fillStyle = 'rgba(43,26,61,0.78)';
+      ctx.fillStyle = 'rgba(43,26,61,0.94)';
       ctx.roundRect(150, y, 780, 104, 24);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(220,199,255,0.26)';
+      ctx.strokeStyle = 'rgba(220,199,255,0.44)';
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.textAlign = 'left';
@@ -3187,32 +3242,29 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
         </div>
       </div>
 
-      <section className="card-surface p-5 mb-5">
-        <div className="flex items-center gap-4 mb-4">
-          {user.avatar ? (
-            <img src={user.avatar} className="w-16 h-16 rounded-full object-cover border-2 border-accent" alt="" />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-surface border border-accent/30 flex items-center justify-center">
-              <Crown size={24} />
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="font-black text-lg truncate">{user.username ? `@${user.username}` : user.displayName}</p>
-            <Badge color="pink">Premium</Badge>
+      <section className="mb-8">
+        <div className="mx-auto w-full max-w-sm aspect-[9/13] rounded-[28px] border border-accent/25 bg-[radial-gradient(circle_at_50%_0%,rgba(233,137,208,0.24),transparent_42%),linear-gradient(180deg,#2A183C_0%,#1E1231_58%,#160B25_100%)] p-6 flex flex-col shadow-2xl shadow-black/25">
+          <p className="text-center text-[10px] font-black tracking-widest text-accent uppercase mb-8">VibeBatch Premium</p>
+          <div className="text-center space-y-3">
+            <p className="text-2xl font-black font-display truncate">{user.username ? `@${user.username}` : user.displayName}</p>
+            <p className="text-sm font-bold text-accent">{user.identityTitle || 'Identity Locked'}</p>
+          </div>
+          <p className="text-sm text-white/78 leading-relaxed text-center mt-8">{description}</p>
+          <div className="mt-auto space-y-3">
+            {topTraits.map((trait, index) => (
+              <div key={trait.id || trait.name} className="flex items-center gap-4 rounded-xl bg-surface/90 border border-accent/35 px-4 py-3 shadow-lg shadow-black/10">
+                <span className="text-[10px] font-black text-accent w-8">#{index + 1}</span>
+                <span className="text-sm font-black text-white truncate">{trait.name}</span>
+              </div>
+            ))}
           </div>
         </div>
-        <p className="text-sm text-white/70 leading-relaxed">{description}</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
-          <Button onClick={downloadPersonalityCard} className="flex items-center justify-center gap-2">
-            <Download size={18} /> Download Personality Card
-          </Button>
-          <Button onClick={downloadAnimatedCard} variant="secondary" className="flex items-center justify-center gap-2">
-            <Download size={18} /> Download Animated Premium Card
-          </Button>
-        </div>
+        <Button onClick={downloadPersonalityCard} className="mt-4 max-w-sm mx-auto flex items-center justify-center gap-2">
+          <Download size={18} /> Download Personality Card
+        </Button>
       </section>
 
-      <section className="card-surface p-5">
+      <section className="card-surface p-5 mb-8">
         <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Anonymous Trait Hints</h3>
         <div className="space-y-3">
           {hints.length > 0 ? hints.map((hint, index) => (
@@ -3227,6 +3279,44 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
             <p className="text-sm text-white/45">Anonymous hints appear after eligible friends vote.</p>
           )}
         </div>
+      </section>
+
+      <section>
+        <div
+          className="mx-auto w-full max-w-sm aspect-[9/16] rounded-[28px] border border-accent/25 p-6 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
+          style={{ background: getTraitscapeStyle(user.traits) }}
+        >
+          <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.055)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.018)_0_1px,transparent_1px_16px)] pointer-events-none" />
+          <div className="absolute top-4 right-4 gradient-button !py-1.5 !px-3 text-[8px] font-black uppercase tracking-widest z-10">Premium</div>
+          {user.avatar ? (
+            <img src={user.avatar} className="w-24 h-24 rounded-full object-cover border-4 border-accent mt-8 relative z-10" alt="" />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-surface border border-accent/30 flex items-center justify-center mt-8 relative z-10">
+              <Crown size={24} />
+            </div>
+          )}
+          <div className="text-center mt-5 relative z-10">
+            <p className="text-2xl font-black font-display">{user.username ? `@${user.username}` : user.displayName}</p>
+            <div className="inline-block gradient-button !py-1.5 !px-4 mt-3 text-[9px] font-black uppercase tracking-widest">{user.identityTitle || 'Identity Locked'}</div>
+          </div>
+          <p className="relative z-10 mt-7 text-[11px] font-black tracking-widest uppercase text-accent">Your Vibe</p>
+          <p className="relative z-10 text-sm text-white/78 leading-relaxed text-center mt-2">{description}</p>
+          <div className="relative z-10 w-full mt-5 space-y-2">
+            {topTraits.map((trait, index) => (
+              <div key={trait.id || trait.name} className="flex items-center gap-3 rounded-xl bg-surface/85 border border-accent/35 px-4 py-3">
+                <span className="text-[10px] font-black text-accent w-8">#{index + 1}</span>
+                <span className="text-xs font-black text-white truncate">{trait.name}</span>
+              </div>
+            ))}
+          </div>
+          <div className="relative z-10 mt-auto text-center">
+            <p className="text-xl font-black font-display">VibeBatch</p>
+            <p className="text-[8px] text-white/40 uppercase tracking-[0.22em] font-bold mt-1">Your Persona through a Digital Lens.</p>
+          </div>
+        </div>
+        <Button onClick={downloadAnimatedCard} variant="secondary" className="mt-4 max-w-sm mx-auto flex items-center justify-center gap-2">
+          <Download size={18} /> Download Animated Premium Card
+        </Button>
       </section>
     </div>
   );
