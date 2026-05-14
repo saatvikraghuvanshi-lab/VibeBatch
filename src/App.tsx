@@ -2940,35 +2940,13 @@ const TraitRow = ({ trait, total }: any) => {
   )
 }
 
-const escapeHtml = (value: string) => (
-  String(value || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-);
-
-const downloadTextFile = (filename: string, content: string, type = 'text/html') => {
-  const blob = new Blob([content], { type });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(link.href);
-};
-
-const imageUrlToDataUrl = async (url: string) => {
-  const response = await fetch(url);
-  const blob = await response.blob();
-
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result || ''));
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-};
+const loadCanvasImage = (src: string) => new Promise<HTMLImageElement>((resolve, reject) => {
+  const image = new Image();
+  image.crossOrigin = 'anonymous';
+  image.onload = () => resolve(image);
+  image.onerror = reject;
+  image.src = src;
+});
 
 const wrapCanvasText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
   const words = String(text || '').split(/\s+/);
@@ -2999,195 +2977,141 @@ const buildLocalPersonalityDescription = (traits: Trait[] = []) => {
   return `Your presence blends ${names.join(', ')} into a profile that feels distinct and memorable. People seem to experience you as someone with a clear signature: expressive, intentional, and easy to recognize in a room.`;
 };
 
-const createPremiumStoryHtml = (user: UserProfile, description: string, backgroundImage: string) => {
-  const topTraits = getPositiveTraits(user.traits).slice(0, 3);
-  const avatar = escapeHtml(user.avatar || '');
-  const username = escapeHtml(user.username ? `@${user.username}` : user.displayName);
-  const title = escapeHtml(user.identityTitle || 'Identity Locked');
-  const safeDescription = escapeHtml(description || buildLocalPersonalityDescription(user.traits));
-  const traits = topTraits.map((trait, index) => `
-    <div class="trait">
-      <span>#${index + 1}</span>
-      <strong>${escapeHtml(trait.name)}</strong>
-    </div>
-  `).join('');
+const drawCoverImage = (ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number) => {
+  const imageRatio = image.width / image.height;
+  const targetRatio = width / height;
+  let sourceWidth = image.width;
+  let sourceHeight = image.height;
+  let sourceX = 0;
+  let sourceY = 0;
 
-  return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>VibeBatch Premium Story</title>
-<style>
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
-    background: #160B25;
-    font-family: Inter, Arial, sans-serif;
-    color: white;
+  if (imageRatio > targetRatio) {
+    sourceWidth = image.height * targetRatio;
+    sourceX = (image.width - sourceWidth) / 2;
+  } else {
+    sourceHeight = image.width / targetRatio;
+    sourceY = (image.height - sourceHeight) / 2;
   }
-  .card {
-    width: min(420px, 100vw);
-    aspect-ratio: 9 / 16;
-    position: relative;
-    overflow: hidden;
-    border-radius: 34px;
-    padding: 34px 32px 34px;
-    background:
-      linear-gradient(180deg, rgba(16,8,28,.36), rgba(16,8,28,.58)),
-      url("${backgroundImage}") center / cover no-repeat;
-    border: 1px solid rgba(220,199,255,.28);
-    box-shadow: 0 28px 70px rgba(0,0,0,.45);
+
+  ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
+};
+
+const downloadPremiumStoryCardPng = async (user: UserProfile, description: string) => {
+  const topTraits = getPositiveTraits(user.traits).slice(0, 3);
+  const background = PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)];
+  const canvas = document.createElement('canvas');
+  canvas.width = 1080;
+  canvas.height = 1920;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const bgImage = await loadCanvasImage(background);
+  drawCoverImage(ctx, bgImage, 0, 0, canvas.width, canvas.height);
+
+  const overlay = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  overlay.addColorStop(0, 'rgba(16,8,28,0.32)');
+  overlay.addColorStop(0.5, 'rgba(16,8,28,0.50)');
+  overlay.addColorStop(1, 'rgba(16,8,28,0.70)');
+  ctx.fillStyle = overlay;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.strokeStyle = 'rgba(220,199,255,0.26)';
+  ctx.lineWidth = 3;
+  ctx.roundRect(54, 54, 972, 1812, 72);
+  ctx.stroke();
+
+  const badgeGradient = ctx.createLinearGradient(400, 110, 680, 172);
+  badgeGradient.addColorStop(0, '#F5D7FF');
+  badgeGradient.addColorStop(1, '#7463D8');
+  ctx.fillStyle = badgeGradient;
+  ctx.beginPath();
+  ctx.roundRect(398, 110, 284, 62, 31);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 24px Inter, Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText('PREMIUM', 540, 150);
+
+  const avatarX = canvas.width / 2;
+  if (user.avatar) {
+    try {
+      const avatar = await loadCanvasImage(user.avatar);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(avatarX, 330, 122, 0, Math.PI * 2);
+      ctx.clip();
+      drawCoverImage(ctx, avatar, avatarX - 122, 208, 244, 244);
+      ctx.restore();
+    } catch {
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath();
+      ctx.arc(avatarX, 330, 122, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
-  .card::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(120deg, transparent 0 24%, rgba(255,255,255,.055) 31%, transparent 39%),
-      repeating-linear-gradient(120deg, rgba(255,255,255,.018) 0 1px, transparent 1px 16px);
-    opacity: .65;
-    pointer-events: none;
-  }
-  .premium {
-    position: absolute;
-    top: 22px;
-    right: 26px;
-    padding: 8px 12px;
-    border-radius: 999px;
-    color: #1E1231;
-    background: linear-gradient(135deg, #F5D7FF, #DCC7FF 52%, #E989D0);
-    font-size: 10px;
-    font-weight: 900;
-    letter-spacing: .14em;
-    text-transform: uppercase;
-  }
-  .avatar {
-    width: 132px;
-    height: 132px;
-    border-radius: 999px;
-    object-fit: cover;
-    display: block;
-    margin: 38px auto 20px;
-    border: 4px solid #DCC7FF;
-    position: relative;
-    z-index: 1;
-  }
-  .avatarFallback {
-    width: 132px;
-    height: 132px;
-    border-radius: 999px;
-    margin: 38px auto 20px;
-    border: 4px solid #DCC7FF;
-    background: rgba(255,255,255,.08);
-    position: relative;
-    z-index: 1;
-  }
-  h1 {
-    margin: 0;
-    text-align: center;
-    font-size: 28px;
-    position: relative;
-    z-index: 1;
-  }
-  .title {
-    width: fit-content;
-    max-width: 100%;
-    margin: 16px auto 0;
-    padding: 9px 16px;
-    border-radius: 999px;
-    color: #1E1231;
-    background: linear-gradient(135deg, #F5D7FF, #DCC7FF 52%, #E989D0);
-    font-size: 10px;
-    font-weight: 900;
-    letter-spacing: .12em;
-    text-transform: uppercase;
-    position: relative;
-    z-index: 1;
-  }
-  .vibeLabel {
-    margin: 26px 0 8px;
-    color: #DCC7FF;
-    font-size: 13px;
-    font-weight: 900;
-    letter-spacing: .18em;
-    text-transform: uppercase;
-    text-align: center;
-    position: relative;
-    z-index: 1;
-  }
-  .description {
-    margin: 0 0 20px;
-    color: rgba(255,255,255,.82);
-    font-size: 13px;
-    line-height: 1.55;
-    text-align: center;
-    position: relative;
-    z-index: 1;
-  }
-  .traits {
-    display: grid;
-    gap: 10px;
-    position: relative;
-    z-index: 1;
-  }
-  .trait {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 13px 14px;
-    border-radius: 14px;
-    background: rgba(43,26,61,.84);
-    border: 1px solid rgba(220,199,255,.34);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
-  }
-  .trait span {
-    color: #DCC7FF;
-    font-size: 10px;
-    font-weight: 900;
-  }
-  .trait strong {
-    color: rgba(255,255,255,.96);
-    font-size: 13px;
-  }
-  .brand {
-    position: absolute;
-    left: 32px;
-    right: 32px;
-    bottom: 28px;
-    text-align: center;
-    z-index: 1;
-  }
-  .brand strong {
-    display: block;
-    font-size: 22px;
-    margin-bottom: 8px;
-  }
-  .brand span {
-    color: rgba(255,255,255,.42);
-    font-size: 9px;
-    font-weight: 900;
-    letter-spacing: .22em;
-    text-transform: uppercase;
-  }
-</style>
-</head>
-<body>
-  <main class="card">
-    <div class="premium">Premium</div>
-    ${avatar ? `<img class="avatar" src="${avatar}" alt="" />` : '<div class="avatarFallback"></div>'}
-    <h1>${username}</h1>
-    <div class="title">${title}</div>
-    <div class="vibeLabel">Your Vibe</div>
-    <p class="description">${safeDescription}</p>
-    <section class="traits">${traits}</section>
-    <div class="brand"><strong>VibeBatch</strong><span>Your Persona through a Digital Lens.</span></div>
-  </main>
-</body>
-</html>`;
+
+  ctx.strokeStyle = '#DCC7FF';
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.arc(avatarX, 330, 128, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 62px Inter, Arial';
+  ctx.fillText(user.username ? `@${user.username}` : user.displayName, canvas.width / 2, 585, 900);
+
+  const title = user.identityTitle || 'Identity Locked';
+  ctx.font = '900 25px Inter, Arial';
+  const titleWidth = Math.min(ctx.measureText(title).width + 96, 580);
+  const titleX = canvas.width / 2 - titleWidth / 2;
+  const titleGradient = ctx.createLinearGradient(titleX, 636, titleX + titleWidth, 696);
+  titleGradient.addColorStop(0, '#F5D7FF');
+  titleGradient.addColorStop(1, '#7463D8');
+  ctx.fillStyle = titleGradient;
+  ctx.beginPath();
+  ctx.roundRect(titleX, 630, titleWidth, 62, 28);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(title.toUpperCase(), canvas.width / 2, 670, titleWidth - 50);
+
+  ctx.fillStyle = '#DCC7FF';
+  ctx.font = '900 30px Inter, Arial';
+  ctx.fillText('YOUR VIBE', canvas.width / 2, 820);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.84)';
+  ctx.font = '700 34px Inter, Arial';
+  const afterDescriptionY = wrapCanvasText(ctx, description || buildLocalPersonalityDescription(user.traits), canvas.width / 2, 890, 820, 50);
+
+  topTraits.forEach((trait, index) => {
+    const y = Math.max(1150, afterDescriptionY + 60) + index * 126;
+    ctx.fillStyle = 'rgba(43,26,61,0.78)';
+    ctx.beginPath();
+    ctx.roundRect(110, y, 860, 94, 24);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(220,199,255,0.34)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#DCC7FF';
+    ctx.font = '900 26px Inter, Arial';
+    ctx.fillText(`#${index + 1}`, 160, y + 58);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 31px Inter, Arial';
+    ctx.fillText(trait.name, 290, y + 60, 600);
+    ctx.textAlign = 'center';
+  });
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 52px Inter, Arial';
+  ctx.fillText('VibeBatch', canvas.width / 2, 1728);
+  ctx.fillStyle = 'rgba(220,199,255,0.78)';
+  ctx.font = '900 20px Inter, Arial';
+  ctx.fillText('YOUR PERSONA THROUGH A DIGITAL LENS.', canvas.width / 2, 1786);
+
+  const link = document.createElement('a');
+  link.download = `vibebatch-premium-${user.username || 'story-card'}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
 };
 
 function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
@@ -3273,12 +3197,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
   };
 
   const downloadPremiumStoryCard = async () => {
-    const randomBackground = PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)];
-    const backgroundDataUrl = await imageUrlToDataUrl(randomBackground);
-    downloadTextFile(
-      `vibebatch-premium-${user.username || 'story-card'}.html`,
-      createPremiumStoryHtml(user, description, backgroundDataUrl)
-    );
+    await downloadPremiumStoryCardPng(user, description);
   };
 
   return (
@@ -3589,13 +3508,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       description = buildLocalPersonalityDescription(user.traits);
     }
 
-    const randomBackground = PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)];
-    const backgroundDataUrl = await imageUrlToDataUrl(randomBackground);
-
-    downloadTextFile(
-      `vibebatch-premium-${user.username || 'story-card'}.html`,
-      createPremiumStoryHtml(user, description, backgroundDataUrl)
-    );
+    await downloadPremiumStoryCardPng(user, description);
   };
   
   return (
