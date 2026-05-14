@@ -1518,8 +1518,8 @@ export default function App() {
 
           {/* Center Column - Main Dashboard Feed */}
           <section className="flex flex-col gap-5 lg:gap-6 lg:overflow-y-auto lg:pr-1 min-w-0">
-            <div className="lg:hidden flex flex-col items-center py-4 space-y-4">
-                <div className="relative">
+            <div className="lg:hidden flex flex-col items-center pt-1 pb-3">
+                <div className="flex flex-col items-center gap-3 w-full">
                   {user.avatar ? (
                     <span className="shimmer-ring block w-24 h-24 rounded-full overflow-hidden">
                       <img src={user.avatar} className="w-full h-full rounded-full object-cover" alt="" />
@@ -1530,18 +1530,18 @@ export default function App() {
                     </div>
                   )}
                   {user.identityTitle ? (
-                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap gradient-button text-white text-[9px] font-black px-4 py-1.5 rounded-full uppercase tracking-wider">
+                    <div className="max-w-[min(22rem,calc(100vw-4rem))] text-center gradient-button text-white text-[9px] font-black px-4 py-1.5 rounded-lg uppercase tracking-wider truncate">
                       {user.identityTitle}
                     </div>
                   ) : (
-                    <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap bg-surface text-white/40 text-[7px] font-bold px-3 py-1.5 border border-white/10 rounded-full uppercase tracking-tighter shadow-xl">
+                    <div className="max-w-[min(22rem,calc(100vw-4rem))] text-center bg-surface text-white/40 text-[7px] font-bold px-3 py-1.5 border border-white/10 rounded-lg uppercase tracking-tighter shadow-xl truncate">
                       Vote on 3+ traits to unlock
                     </div>
                   )}
                 </div>
-               <div className="text-center pt-4">
-                 <h2 className="text-xl font-bold font-display">{user.displayName}</h2>
-                 <p className="text-accent text-xs">@{user.username}</p>
+               <div className="text-center mt-4 min-w-0 max-w-full">
+                 <h2 className="text-xl font-bold font-display truncate max-w-[calc(100vw-3rem)]">{user.displayName}</h2>
+                 <p className="text-accent text-xs truncate max-w-[calc(100vw-3rem)]">@{user.username}</p>
                </div>
             </div>
 
