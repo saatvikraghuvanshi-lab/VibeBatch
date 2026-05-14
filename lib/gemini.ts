@@ -34,3 +34,30 @@ export async function generateIdentityTitle(traits: Trait[]): Promise<string> {
     return "The Magnetic Storyteller"; // Fallback
   }
 }
+
+export async function generatePersonalityDescription(traits: Trait[]): Promise<string> {
+  const topTraits = [...traits]
+    .sort((a, b) => b.votes - a.votes)
+    .filter(t => t.votes > 0)
+    .slice(0, 3)
+    .map(t => t.name)
+    .join(", ");
+
+  if (!topTraits) {
+    return "Your VibeBatch profile is still forming as friends add their first impressions.";
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const prompt = `Write a refined, warm 2 sentence personality description based only on these voted traits: ${topTraits}. Keep it personal, polished, and suitable for a premium social profile card. Do not mention voting, percentages, or data.`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text().trim().replace(/^["']|["']$/g, '');
+
+    return text || "You come across as layered, memorable, and quietly distinctive, with a presence people notice and remember. Your strongest traits suggest someone who brings intention, warmth, and momentum into the spaces they enter.";
+  } catch (error) {
+    console.error("AI description failed:", error);
+    return "You come across as layered, memorable, and quietly distinctive, with a presence people notice and remember. Your strongest traits suggest someone who brings intention, warmth, and momentum into the spaces they enter.";
+  }
+}
