@@ -1442,8 +1442,8 @@ export default function App() {
         {/* Header - Desktop & Mobile */}
         <header className="flex justify-between items-start xl:items-center mb-5 lg:mb-8 max-w-7xl mx-auto w-full min-w-0 gap-4">
           <div className="min-w-0 flex-1 pr-2">
-            <h1 className="text-4xl sm:text-5xl lg:text-4xl font-display font-extrabold text-gradient leading-none truncate">VibeBatch</h1>
-            <p className="mt-2 max-w-[220px] sm:max-w-none text-[11px] lg:text-xs text-accent font-bold tracking-[0.18em] uppercase leading-relaxed">Your Persona through a Digital Lens.</p>
+            <h1 className="text-[2.35rem] sm:text-5xl lg:text-4xl font-display font-extrabold text-gradient leading-none truncate">VibeBatch</h1>
+            <p className="mt-2 max-w-[260px] sm:max-w-none text-[10px] sm:text-[11px] lg:text-xs text-accent font-bold tracking-[0.16em] uppercase leading-relaxed">Your Persona through a Digital Lens.</p>
           </div>
           
           <div className="flex items-center gap-3 shrink-0">
@@ -2968,6 +2968,23 @@ const wrapCanvasText = (ctx: CanvasRenderingContext2D, text: string, x: number, 
   return y + lines.length * lineHeight;
 };
 
+const setFittedCanvasFont = (
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  fontSize: number,
+  minFontSize: number,
+  weight = '900',
+  family = 'Inter, Arial'
+) => {
+  let size = fontSize;
+  do {
+    ctx.font = `${weight} ${size}px ${family}`;
+    if (ctx.measureText(text).width <= maxWidth) break;
+    size -= 2;
+  } while (size > minFontSize);
+};
+
 const buildLocalPersonalityDescription = (traits: Trait[] = []) => {
   const names = getPositiveTraits(traits).slice(0, 3).map(trait => trait.name);
   if (names.length === 0) {
@@ -2998,6 +3015,9 @@ const drawCoverImage = (ctx: CanvasRenderingContext2D, image: HTMLImageElement, 
 
 const downloadPremiumStoryCardPng = async (user: UserProfile, description: string) => {
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
+  const traitNames = topTraits.length
+    ? topTraits.map(trait => trait.name)
+    : ['Vibe still forming', 'More votes loading', 'Trait signals pending'];
   const background = PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)];
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
@@ -3057,11 +3077,12 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
   ctx.stroke();
 
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 62px Inter, Arial';
-  ctx.fillText(user.username ? `@${user.username}` : user.displayName, canvas.width / 2, 585, 900);
+  const displayHandle = user.username ? `@${user.username}` : user.displayName;
+  setFittedCanvasFont(ctx, displayHandle, 900, 62, 40, '900');
+  ctx.fillText(displayHandle, canvas.width / 2, 585, 900);
 
   const title = user.identityTitle || 'Identity Locked';
-  ctx.font = '900 25px Inter, Arial';
+  setFittedCanvasFont(ctx, title.toUpperCase(), 500, 25, 18, '900');
   const titleWidth = Math.min(ctx.measureText(title).width + 96, 580);
   const titleX = canvas.width / 2 - titleWidth / 2;
   const titleGradient = ctx.createLinearGradient(titleX, 636, titleX + titleWidth, 696);
@@ -3082,22 +3103,22 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
   ctx.font = '700 34px Inter, Arial';
   const afterDescriptionY = wrapCanvasText(ctx, description || buildLocalPersonalityDescription(user.traits), canvas.width / 2, 890, 820, 50);
 
-  topTraits.forEach((trait, index) => {
+  traitNames.slice(0, 3).forEach((traitName, index) => {
     const y = Math.max(1150, afterDescriptionY + 60) + index * 126;
-    ctx.fillStyle = 'rgba(43,26,61,0.78)';
+    ctx.fillStyle = 'rgba(30,16,46,0.92)';
     ctx.beginPath();
     ctx.roundRect(110, y, 860, 94, 24);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(220,199,255,0.34)';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(220,199,255,0.58)';
+    ctx.lineWidth = 3;
     ctx.stroke();
     ctx.textAlign = 'left';
     ctx.fillStyle = '#DCC7FF';
     ctx.font = '900 26px Inter, Arial';
     ctx.fillText(`#${index + 1}`, 160, y + 58);
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 31px Inter, Arial';
-    ctx.fillText(trait.name, 290, y + 60, 600);
+    setFittedCanvasFont(ctx, traitName, 620, 31, 24, '900');
+    ctx.fillText(traitName, 290, y + 60, 620);
     ctx.textAlign = 'center';
   });
 
@@ -3140,6 +3161,9 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
   }, [user.id, user.traits]);
 
   const downloadPersonalityCard = async () => {
+    const traitNames = topTraits.length
+      ? topTraits.map(trait => trait.name)
+      : ['Vibe still forming', 'More votes loading', 'Trait signals pending'];
     const canvas = document.createElement('canvas');
     canvas.width = 1080;
     canvas.height = 1600;
@@ -3162,32 +3186,35 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
     ctx.fillText('VIBEBATCH PREMIUM', canvas.width / 2, 150);
 
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 72px Inter, Arial';
-    ctx.fillText(user.username ? `@${user.username}` : user.displayName, canvas.width / 2, 300, 860);
+    const displayHandle = user.username ? `@${user.username}` : user.displayName;
+    setFittedCanvasFont(ctx, displayHandle, 860, 72, 44, '900');
+    ctx.fillText(displayHandle, canvas.width / 2, 300, 860);
 
     ctx.fillStyle = '#F5D7FF';
-    ctx.font = '900 34px Inter, Arial';
-    ctx.fillText(user.identityTitle || 'Identity Locked', canvas.width / 2, 370, 760);
+    const title = user.identityTitle || 'Identity Locked';
+    setFittedCanvasFont(ctx, title, 760, 34, 24, '900');
+    ctx.fillText(title, canvas.width / 2, 370, 760);
 
     ctx.fillStyle = 'rgba(255,255,255,0.78)';
     ctx.font = '500 34px Inter, Arial';
     wrapCanvasText(ctx, description, canvas.width / 2, 520, 780, 52);
 
-    topTraits.forEach((trait, index) => {
+    traitNames.slice(0, 3).forEach((traitName, index) => {
       const y = 940 + index * 132;
-      ctx.fillStyle = 'rgba(43,26,61,0.94)';
+      ctx.fillStyle = 'rgba(30,16,46,0.96)';
+      ctx.beginPath();
       ctx.roundRect(150, y, 780, 104, 24);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(220,199,255,0.44)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(220,199,255,0.62)';
+      ctx.lineWidth = 3;
       ctx.stroke();
       ctx.textAlign = 'left';
       ctx.fillStyle = '#DCC7FF';
       ctx.font = '900 26px Inter, Arial';
       ctx.fillText(`#${index + 1}`, 206, y + 64);
       ctx.fillStyle = '#FFFFFF';
-      ctx.font = '800 32px Inter, Arial';
-      ctx.fillText(trait.name, 300, y + 66, 560);
+      setFittedCanvasFont(ctx, traitName, 580, 32, 24, '900');
+      ctx.fillText(traitName, 300, y + 66, 580);
     });
 
     const link = document.createElement('a');
@@ -3251,35 +3278,35 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
 
       <section>
         <div
-          className="mx-auto w-full max-w-sm aspect-[9/16] rounded-[28px] border border-accent/25 p-6 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
+          className="mx-auto w-full max-w-[340px] aspect-[9/16] rounded-[28px] border border-accent/25 p-5 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
           style={{
             background: `linear-gradient(180deg, rgba(16,8,28,.36), rgba(16,8,28,.58)), url("${PREMIUM_STORY_BACKGROUNDS[0]}") center / cover no-repeat`
           }}
         >
           <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.055)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.018)_0_1px,transparent_1px_16px)] pointer-events-none" />
-          <div className="absolute top-4 right-4 gradient-button !py-1.5 !px-3 text-[8px] font-black uppercase tracking-widest z-10">Premium</div>
+          <div className="absolute top-4 right-4 gradient-button !py-1 !px-3 text-[8px] font-black uppercase tracking-widest z-10">Premium</div>
           {user.avatar ? (
-            <img src={user.avatar} className="w-24 h-24 rounded-full object-cover border-4 border-accent mt-8 relative z-10" alt="" />
+            <img src={user.avatar} className="w-20 h-20 rounded-full object-cover border-4 border-accent mt-7 relative z-10" alt="" />
           ) : (
-            <div className="w-24 h-24 rounded-full bg-surface border border-accent/30 flex items-center justify-center mt-8 relative z-10">
+            <div className="w-20 h-20 rounded-full bg-surface border border-accent/30 flex items-center justify-center mt-7 relative z-10">
               <Crown size={24} />
             </div>
           )}
-          <div className="text-center mt-5 relative z-10">
-            <p className="text-2xl font-black font-display">{user.username ? `@${user.username}` : user.displayName}</p>
-            <div className="inline-block gradient-button !py-1.5 !px-4 mt-3 text-[9px] font-black uppercase tracking-widest">{user.identityTitle || 'Identity Locked'}</div>
+          <div className="text-center mt-4 relative z-10 w-full min-w-0">
+            <p className="text-[clamp(1.15rem,6vw,1.55rem)] leading-tight font-black font-display break-words px-1">{user.username ? `@${user.username}` : user.displayName}</p>
+            <div className="inline-block max-w-full gradient-button !py-1.5 !px-4 mt-2 text-[8px] font-black uppercase tracking-[0.12em] truncate">{user.identityTitle || 'Identity Locked'}</div>
           </div>
-          <p className="relative z-10 mt-7 text-[11px] font-black tracking-widest uppercase text-accent">Your Vibe</p>
-          <p className="relative z-10 text-sm text-white/78 leading-relaxed text-center mt-2">{description}</p>
-          <div className="relative z-10 w-full mt-5 space-y-2">
+          <p className="relative z-10 mt-5 text-[10px] font-black tracking-widest uppercase text-accent">Your Vibe</p>
+          <p className="relative z-10 text-[12px] text-white/82 leading-relaxed text-center mt-2 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:5] [-webkit-box-orient:vertical]">{description}</p>
+          <div className="relative z-10 w-full mt-4 space-y-2">
             {topTraits.map((trait, index) => (
-              <div key={trait.id || trait.name} className="flex items-center gap-3 rounded-xl bg-surface/85 border border-accent/35 px-4 py-3">
+              <div key={trait.id || trait.name} className="flex items-center gap-3 rounded-xl bg-surface/90 border border-accent/50 px-4 py-2.5">
                 <span className="text-[10px] font-black text-accent w-8">#{index + 1}</span>
-                <span className="text-xs font-black text-white truncate">{trait.name}</span>
+                <span className="text-[11px] font-black text-white truncate">{trait.name}</span>
               </div>
             ))}
           </div>
-          <div className="relative z-10 mt-auto text-center">
+          <div className="relative z-10 mt-auto pt-3 text-center">
             <p className="text-xl font-black font-display">VibeBatch</p>
             <p className="text-[8px] text-white/40 uppercase tracking-[0.22em] font-bold mt-1">Your Persona through a Digital Lens.</p>
           </div>
