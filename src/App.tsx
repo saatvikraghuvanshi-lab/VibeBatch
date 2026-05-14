@@ -153,6 +153,17 @@ const PREMIUM_STORY_BACKGROUNDS = [
   premiumBg14,
   premiumBg15,
 ];
+const PREMIUM_BACKGROUND_KEY = 'vibebatch_last_premium_background';
+
+const getNextPremiumBackground = () => {
+  const lastIndex = Number(window.localStorage.getItem(PREMIUM_BACKGROUND_KEY) || '-1');
+  const availableIndexes = PREMIUM_STORY_BACKGROUNDS
+    .map((_, index) => index)
+    .filter(index => index !== lastIndex);
+  const nextIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)] ?? 0;
+  window.localStorage.setItem(PREMIUM_BACKGROUND_KEY, String(nextIndex));
+  return PREMIUM_STORY_BACKGROUNDS[nextIndex];
+};
 
 const isEligibleLength = (value?: string) => (
   FRIENDSHIP_LENGTH_OPTIONS.some(option => option.value === value && option.eligible)
@@ -2992,6 +3003,39 @@ const loadCanvasImage = (src: string) => new Promise<HTMLImageElement>((resolve,
   image.src = src;
 });
 
+const blobToDataUrl = (blob: Blob) => new Promise<string>((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onloadend = () => resolve(String(reader.result || ''));
+  reader.onerror = reject;
+  reader.readAsDataURL(blob);
+});
+
+const loadCleanCanvasImage = async (src?: string) => {
+  if (!src) return null;
+  try {
+    if (/^https?:\/\//i.test(src)) {
+      const response = await fetch(src);
+      if (!response.ok) throw new Error('Image could not be fetched');
+      const dataUrl = await blobToDataUrl(await response.blob());
+      return await loadCanvasImage(dataUrl);
+    }
+    return await loadCanvasImage(src);
+  } catch {
+    return null;
+  }
+};
+
+const downloadCanvasAsPng = (canvas: HTMLCanvasElement, filename: string) => {
+  canvas.toBlob(blob => {
+    if (!blob) return;
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }, 'image/png');
+};
+
 const wrapCanvasText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
   const words = String(text || '').split(/\s+/);
   const lines: string[] = [];
@@ -3057,12 +3101,11 @@ const drawCoverImage = (ctx: CanvasRenderingContext2D, image: HTMLImageElement, 
   ctx.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, x, y, width, height);
 };
 
-const downloadPremiumStoryCardPng = async (user: UserProfile, description: string) => {
+const downloadPremiumStoryCardPng = async (user: UserProfile, description: string, background = getNextPremiumBackground()) => {
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
   const traitNames = topTraits.length
     ? topTraits.map(trait => trait.name)
     : ['Vibe still forming', 'More votes loading', 'Trait signals pending'];
-  const background = PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)];
   const canvas = document.createElement('canvas');
   canvas.width = 1080;
   canvas.height = 1920;
@@ -3073,9 +3116,9 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
   drawCoverImage(ctx, bgImage, 0, 0, canvas.width, canvas.height);
 
   const overlay = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  overlay.addColorStop(0, 'rgba(16,8,28,0.32)');
-  overlay.addColorStop(0.5, 'rgba(16,8,28,0.50)');
-  overlay.addColorStop(1, 'rgba(16,8,28,0.70)');
+  overlay.addColorStop(0, 'rgba(16,8,28,0.22)');
+  overlay.addColorStop(0.52, 'rgba(16,8,28,0.42)');
+  overlay.addColorStop(1, 'rgba(16,8,28,0.62)');
   ctx.fillStyle = overlay;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -3097,21 +3140,19 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
   ctx.fillText('PREMIUM', 540, 150);
 
   const avatarX = canvas.width / 2;
-  if (user.avatar) {
-    try {
-      const avatar = await loadCanvasImage(user.avatar);
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(avatarX, 330, 122, 0, Math.PI * 2);
-      ctx.clip();
-      drawCoverImage(ctx, avatar, avatarX - 122, 208, 244, 244);
-      ctx.restore();
-    } catch {
-      ctx.fillStyle = 'rgba(255,255,255,0.12)';
-      ctx.beginPath();
-      ctx.arc(avatarX, 330, 122, 0, Math.PI * 2);
-      ctx.fill();
-    }
+  const avatar = await loadCleanCanvasImage(user.avatar);
+  if (avatar) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(avatarX, 330, 122, 0, Math.PI * 2);
+    ctx.clip();
+    drawCoverImage(ctx, avatar, avatarX - 122, 208, 244, 244);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    ctx.arc(avatarX, 330, 122, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.strokeStyle = '#DCC7FF';
@@ -3122,7 +3163,7 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
 
   ctx.fillStyle = '#FFFFFF';
   const displayHandle = user.username ? `@${user.username}` : user.displayName;
-  setFittedCanvasFont(ctx, displayHandle, 900, 62, 40, '900');
+  setFittedCanvasFont(ctx, displayHandle, 900, 58, 36, '900');
   ctx.fillText(displayHandle, canvas.width / 2, 585, 900);
 
   const title = user.identityTitle || 'Identity Locked';
@@ -3144,11 +3185,11 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
   ctx.fillText('YOUR VIBE', canvas.width / 2, 820);
 
   ctx.fillStyle = 'rgba(255,255,255,0.84)';
-  ctx.font = '700 34px Inter, Arial';
-  const afterDescriptionY = wrapCanvasText(ctx, description || buildLocalPersonalityDescription(user.traits), canvas.width / 2, 890, 820, 50);
+  ctx.font = '700 30px Inter, Arial';
+  const afterDescriptionY = wrapCanvasText(ctx, description || buildLocalPersonalityDescription(user.traits), canvas.width / 2, 890, 830, 44);
 
   traitNames.slice(0, 3).forEach((traitName, index) => {
-    const y = Math.max(1150, afterDescriptionY + 60) + index * 126;
+    const y = Math.max(1190, afterDescriptionY + 50) + index * 118;
     ctx.fillStyle = 'rgba(30,16,46,0.92)';
     ctx.beginPath();
     ctx.roundRect(110, y, 860, 94, 24);
@@ -3173,16 +3214,14 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
   ctx.font = '900 20px Inter, Arial';
   ctx.fillText('YOUR PERSONA THROUGH A DIGITAL LENS.', canvas.width / 2, 1786);
 
-  const link = document.createElement('a');
-  link.download = `vibebatch-premium-${user.username || 'personality-card'}.png`;
-  link.href = canvas.toDataURL('image/png');
-  link.click();
+  downloadCanvasAsPng(canvas, `vibebatch-premium-${user.username || 'personality-card'}.png`);
 };
 
 function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
   const premium = isPremiumUser(user);
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
   const [description, setDescription] = useState(buildLocalPersonalityDescription(user.traits));
+  const [previewBackground, setPreviewBackground] = useState(() => PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)] || PREMIUM_STORY_BACKGROUNDS[0]);
   const votedFriends = user.friends.filter(friend => friend.hasVoted);
   const hints = votedFriends.slice(0, 6).map((friend, index) => ({
     id: friend.id,
@@ -3209,7 +3248,9 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
   }, [user.id, user.traits]);
 
   const downloadPremiumStoryCard = async () => {
-    await downloadPremiumStoryCardPng(user, description);
+    const background = getNextPremiumBackground();
+    setPreviewBackground(background);
+    await downloadPremiumStoryCardPng(user, description, background);
   };
 
   if (!premium) {
@@ -3290,7 +3331,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
         <div
           className="mx-auto w-full max-w-[340px] aspect-[9/16] rounded-[28px] border border-accent/25 p-5 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
           style={{
-            background: `linear-gradient(180deg, rgba(16,8,28,.36), rgba(16,8,28,.58)), url("${PREMIUM_STORY_BACKGROUNDS[0]}") center / cover no-repeat`
+            background: `linear-gradient(180deg, rgba(16,8,28,.18), rgba(16,8,28,.46)), url("${previewBackground}") center / cover no-repeat`
           }}
         >
           <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.055)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.018)_0_1px,transparent_1px_16px)] pointer-events-none" />
@@ -3303,12 +3344,12 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
             </div>
           )}
           <div className="text-center mt-4 relative z-10 w-full min-w-0">
-            <p className="text-[clamp(1.15rem,6vw,1.55rem)] leading-tight font-black font-display break-words px-1">{user.username ? `@${user.username}` : user.displayName}</p>
+            <p className="text-[clamp(1rem,4.8vw,1.35rem)] leading-tight font-black font-display truncate px-1">{user.username ? `@${user.username}` : user.displayName}</p>
             <div className="inline-block max-w-full gradient-button !py-1.5 !px-4 mt-2 text-[8px] font-black uppercase tracking-[0.12em] truncate">{user.identityTitle || 'Identity Locked'}</div>
           </div>
           <p className="relative z-10 mt-5 text-[10px] font-black tracking-widest uppercase text-accent">Your Vibe</p>
-          <p className="relative z-10 text-[12px] text-white/82 leading-relaxed text-center mt-2 overflow-hidden [display:-webkit-box] [-webkit-line-clamp:5] [-webkit-box-orient:vertical]">{description}</p>
-          <div className="relative z-10 w-full mt-4 space-y-2">
+          <p className="relative z-10 text-[10px] sm:text-[11px] text-white/88 leading-relaxed text-center mt-2">{description}</p>
+          <div className="relative z-10 w-full mt-3 space-y-2">
             {topTraits.map((trait, index) => (
               <div key={trait.id || trait.name} className="flex items-center gap-3 rounded-xl bg-surface/90 border border-accent/50 px-4 py-2.5">
                 <span className="text-[10px] font-black text-accent w-8">#{index + 1}</span>
