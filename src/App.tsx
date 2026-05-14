@@ -3533,6 +3533,14 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       ctx.fill();
     });
 
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 72px Inter, Arial';
+    ctx.fillText('VibeBatch', canvas.width / 2, 1608);
+    ctx.fillStyle = 'rgba(220,199,255,0.86)';
+    ctx.font = '900 24px Inter, Arial';
+    ctx.fillText('YOUR PERSONA THROUGH A DIGITAL LENS.', canvas.width / 2, 1672);
+
     const link = document.createElement('a');
     link.download = `vibebatch-${user.username || 'story-card'}.png`;
     link.href = canvas.toDataURL('image/png');
@@ -3610,6 +3618,10 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
              </div>
            </div>
            <div className="h-8 relative z-10" />
+           <div className="absolute bottom-8 left-6 right-6 z-10 text-center">
+             <h1 className="text-3xl font-display font-black text-white leading-none">VibeBatch</h1>
+             <p className="text-[9px] text-accent/85 uppercase tracking-[0.24em] font-black mt-3">Your Persona through a Digital Lens.</p>
+           </div>
         </div>
       </div>
 
