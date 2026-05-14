@@ -99,8 +99,27 @@ const PREMIUM_EMAILS = new Set([
   'shivankarraghuwanshi2506@gmail.com',
 ]);
 
+const PREMIUM_IDENTIFIERS = new Set([
+  'saatvikraghuvanshi123',
+  'saatv1k',
+  'saatvik raghuvanshi',
+  'shivankar',
+  'shivvv',
+  'shivankar raghuwanshi',
+]);
+
 const isPremiumEmail = (email?: string) => PREMIUM_EMAILS.has(String(email || '').trim().toLowerCase());
-const isPremiumUser = (user?: UserProfile | null) => Boolean(user?.isPremium || isPremiumEmail(user?.email));
+const normalizePremiumIdentifier = (value?: string) => String(value || '').trim().replace(/^@/, '').toLowerCase();
+const isPremiumIdentifier = (value?: string) => PREMIUM_IDENTIFIERS.has(normalizePremiumIdentifier(value));
+const isPremiumProfile = (profile: any) => Boolean(
+  profile?.is_premium ||
+  profile?.isPremium ||
+  isPremiumEmail(profile?.email) ||
+  isPremiumIdentifier(profile?.username) ||
+  isPremiumIdentifier(profile?.display_name) ||
+  isPremiumIdentifier(profile?.displayName)
+);
+const isPremiumUser = (user?: UserProfile | null) => Boolean(user && isPremiumProfile(user));
 
 const isEligibleLength = (value?: string) => (
   FRIENDSHIP_LENGTH_OPTIONS.some(option => option.value === value && option.eligible)
@@ -265,7 +284,7 @@ const mapProfileToUser = (profile: any, friends: Friend[] = []): UserProfile => 
     email: profile.email || '',
     contactNumber: profile.contact_number || profile.contactNumber || '',
     avatar: profile.avatar_url || profile.avatar || '',
-    isPremium: Boolean(profile.is_premium || profile.isPremium || isPremiumEmail(profile.email)),
+    isPremium: isPremiumProfile(profile),
     traits,
     identityTitle: profile.identity_title || profile.identityTitle,
     friends,
@@ -612,7 +631,7 @@ export default function App() {
     return mapProfileToUser({
       ...profile,
       email: authData.user?.email || profile.email,
-      isPremium: profile.is_premium || isPremiumEmail(authData.user?.email),
+      isPremium: profile.is_premium || isPremiumEmail(authData.user?.email) || isPremiumProfile(profile),
       traits: profile.traits?.length ? profile.traits : (explicitTraits.get(userId) || []),
     }, friends);
   };
@@ -728,7 +747,7 @@ export default function App() {
           user: mapProfileToUser({
             ...profile,
             email: user.email,
-            isPremium: profile.is_premium || isPremiumEmail(user.email),
+            isPremium: profile.is_premium || isPremiumEmail(user.email) || isPremiumProfile(profile),
           }, friends),
           isAuthenticated: true
         });
