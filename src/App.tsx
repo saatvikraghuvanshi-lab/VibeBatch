@@ -42,7 +42,7 @@ import {
 import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
 import { getStore, saveStore } from '../lib/store';
 import { generateIdentityTitle, generatePersonalityDescription } from '../lib/gemini';
-import vbLogo from './assets/vb-logo.jpeg';
+import vbLogo from './assets/vb-logo.png';
 
 // --- Components ---
 
@@ -3407,7 +3407,6 @@ function PublicProfileScreen({ user, onBack, onVote }: any) {
 function StoryCardGeneratorScreen({ user, onBack }: any) {
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
   const hasVotes = topTraits.length > 0;
-  const premium = isPremiumUser(user);
 
   const downloadStoryCard = async () => {
     const canvas = document.createElement('canvas');
@@ -3435,6 +3434,19 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     ctx.fillStyle = lowerGlow;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    try {
+      const logo = new Image();
+      logo.crossOrigin = 'anonymous';
+      logo.src = vbLogo;
+      await new Promise((resolve, reject) => {
+        logo.onload = resolve;
+        logo.onerror = reject;
+      });
+      ctx.drawImage(logo, 72, 72, 118, 118);
+    } catch {
+      // The story card still works if the decorative logo cannot be drawn.
+    }
+
     ctx.textAlign = 'center';
     ctx.fillStyle = '#FFFFFF';
     ctx.font = '700 72px Inter, Arial';
@@ -3460,19 +3472,6 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     ctx.beginPath();
     ctx.arc(canvas.width / 2, 430, 150, 0, Math.PI * 2);
     ctx.stroke();
-
-    if (premium) {
-      const premiumGradient = ctx.createLinearGradient(718, 120, 934, 172);
-      premiumGradient.addColorStop(0, '#F5D7FF');
-      premiumGradient.addColorStop(1, '#E989D0');
-      ctx.fillStyle = premiumGradient;
-      ctx.beginPath();
-      ctx.roundRect(720, 116, 220, 58, 29);
-      ctx.fill();
-      ctx.fillStyle = '#1E1231';
-      ctx.font = '900 22px Inter, Arial';
-      ctx.fillText('PREMIUM', 830, 153);
-    }
 
     if (user.avatar) {
       try {
@@ -3541,6 +3540,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
   };
 
   const downloadPremiumAnimatedStoryCard = async () => {
+    const premium = isPremiumUser(user);
     if (!premium) {
       alert('Premium animated story cards are available for VibeBatch Premium users.');
       return;
@@ -3570,11 +3570,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
         {/* Story Card Preview */}
         <div id="story-card" className="w-[340px] aspect-[9/16] bg-background rounded-[32px] overflow-hidden border border-accent/25 relative p-6 flex flex-col items-center justify-between shadow-2xl shadow-black/30">
            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(233,137,208,0.26),transparent_42%),radial-gradient(circle_at_95%_85%,rgba(116,99,216,0.22),transparent_38%),linear-gradient(180deg,#2A183C_0%,#1E1231_55%,#160B25_100%)] pointer-events-none" />
-           {premium && (
-             <div className="absolute top-4 right-4 z-20 gradient-button !py-1.5 !px-3 text-[8px] font-black uppercase tracking-widest flex items-center gap-1">
-               <Crown size={12} /> Premium
-             </div>
-           )}
+           <img src={vbLogo} alt="" className="absolute top-4 left-4 z-20 w-10 h-10 object-contain" />
            
            <div className="mt-16 flex flex-col items-center space-y-8 relative z-10 w-full">
              {user.avatar ? (
