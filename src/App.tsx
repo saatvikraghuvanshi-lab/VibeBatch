@@ -1132,12 +1132,12 @@ export default function App() {
     setIsProfileSheetOpen(false);
   };
 
-  const resetPassword = async () => {
+  const resetPassword = async (emailOverride?: string) => {
     setLoading(true);
     try {
       const { data: authData } = await supabase.auth.getUser();
 
-      if (authData.user) {
+      if (authState.isAuthenticated && authData.user) {
         const newPassword = window.prompt('Enter your new VibeBatch password');
         if (!newPassword) return;
 
@@ -1152,10 +1152,14 @@ export default function App() {
         return;
       }
 
-      const email = window.prompt('Enter your account email');
-      if (!email?.trim()) return;
+      const email = String(emailOverride || window.prompt('Enter your account email') || '').trim();
+      if (!email) return;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        alert('Please enter a valid email address before resetting your password.');
+        return;
+      }
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
       });
       if (error) throw error;
@@ -1321,7 +1325,11 @@ export default function App() {
             <div className="text-right">
               <button
                 type="button"
-                onClick={() => onResetPassword()}
+                onClick={(event) => {
+                  const form = event.currentTarget.closest('form');
+                  const email = form ? String(new FormData(form).get('email') || '') : '';
+                  onResetPassword(email);
+                }}
                 className="text-accent text-sm font-medium hover:underline"
               >
                 Forgot password?
