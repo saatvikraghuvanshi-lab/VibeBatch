@@ -3572,23 +3572,6 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     link.click();
   };
 
-  const downloadPremiumAnimatedStoryCard = async () => {
-    const premium = isPremiumUser(user);
-    if (!premium) {
-      alert('Premium personality cards are available for VibeBatch Premium users.');
-      return;
-    }
-
-    let description = buildLocalPersonalityDescription(user.traits);
-    try {
-      description = await generatePersonalityDescription(topTraits.length ? topTraits : user.traits);
-    } catch {
-      description = buildLocalPersonalityDescription(user.traits);
-    }
-
-    await downloadPremiumStoryCardPng(user, description);
-  };
-  
   return (
     <div className="min-h-screen p-4 flex flex-col">
        <div className="flex items-center gap-4 mb-6">
@@ -3651,10 +3634,6 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
         <Button className="flex items-center justify-center gap-3" onClick={downloadStoryCard}>
            <Download size={20} /> Download (Free)
         </Button>
-        <button onClick={downloadPremiumAnimatedStoryCard} className="w-full p-4 rounded-xl border border-accent/30 text-accent font-bold text-sm flex items-center justify-center gap-2 bg-accent/5">
-           <Download size={18} /> Download Premium Personality Card
-           <Badge color="accent" className="ml-2 scale-75">Premium</Badge>
-        </button>
       </div>
     </div>
   );
