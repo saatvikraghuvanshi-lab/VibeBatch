@@ -239,7 +239,32 @@ const markLocalConfirmedVote = (userId: string, friendId: string) => {
   window.localStorage.setItem(getConfirmedVoteKey(userId, friendId), new Date().toISOString());
 };
 
-const mapSupabaseTraits = (rows: any[] = []) => {
+const getCustomTraitsKey = (userId?: string) => (
+  userId ? `vibebatch_custom_traits_${userId}` : ''
+);
+const getLocalCustomTraits = (userId?: string) => {
+  const key = getCustomTraitsKey(userId);
+  if (!key) return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || '[]');
+    return Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : [];
+  } catch {
+    return [];
+  }
+};
+const saveLocalCustomTraits = (userId: string, traits: string[]) => {
+  window.localStorage.setItem(getCustomTraitsKey(userId), JSON.stringify(traits));
+};
+const getProfileCustomTraits = (profile: any) => {
+  const raw = profile?.custom_traits || profile?.customTraits || [];
+  const profileTraits = Array.isArray(raw)
+    ? raw
+    : String(raw || '').split(',').map(item => item.trim()).filter(Boolean);
+
+  return [...new Set([...profileTraits, ...getLocalCustomTraits(profile?.id)])];
+};
+
+const mapSupabaseTraits = (rows: any[] = [], customTraitNames: string[] = []) => {
   const mapped = PREDEFINED_TRAITS.map(pt => {
     const traitName = pt.name || '';
     const match = rows.find((row: any) => (
@@ -268,6 +293,17 @@ const mapSupabaseTraits = (rows: any[] = []) => {
     });
   });
 
+  customTraitNames.forEach((traitName: string) => {
+    if (!traitName || mapped.some(trait => normalizeTraitName(trait.name) === normalizeTraitName(traitName))) return;
+    mapped.push({
+      id: `custom-${normalizeTraitName(traitName)}`,
+      name: traitName,
+      category: 'custom',
+      votes: 0,
+      voters: [],
+    });
+  });
+
   return mapped;
 };
 
@@ -284,7 +320,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   const relationshipLength = link?.relationship_length || '';
   const friendRelationshipLength = reverseLink?.relationship_length || '';
   const isVoteEligible = isEligibleLength(relationshipLength) && isEligibleLength(friendRelationshipLength);
-  const traits = mapSupabaseTraits(profile.traits || []);
+  const traits = mapSupabaseTraits(profile.traits || [], getProfileCustomTraits(profile));
   const totalVotes = profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
   const voteRecord = { traits, totalVotes };
 
@@ -307,7 +343,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
 };
 
 const mapProfileToUser = (profile: any, friends: Friend[] = []): UserProfile => {
-  const traits = mapSupabaseTraits(profile.traits || []);
+  const traits = mapSupabaseTraits(profile.traits || [], getProfileCustomTraits(profile));
   const totalVotes = profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
 
   return ({
@@ -635,7 +671,7 @@ export default function App() {
         username: profile.username || friend.username,
         displayName: profile.display_name || friend.displayName,
         avatar: profile.avatar_url || friend.avatar,
-        traits: mapSupabaseTraits(traits),
+        traits: mapSupabaseTraits(traits, getProfileCustomTraits(profile)),
       });
     } catch (error) {
       console.warn('Could not refresh friend details:', error);
@@ -1256,29 +1292,34 @@ export default function App() {
 
     setLoading(true);
     try {
-      const traitRow = {
-        user_id: authState.user.id,
-        trait_id: cleanName,
-        votes_count: 0,
-      };
-      const { error } = await supabase
-        .from('traits')
-        .upsert([traitRow], { onConflict: 'user_id,trait_id' });
+      const existingCustomTraits = getProfileCustomTraits(authState.user);
+      const nextCustomTraits = [
+        ...existingCustomTraits.filter(name => normalizeTraitName(name) !== normalizeTraitName(cleanName)),
+        cleanName,
+      ];
 
-      if (error) {
-        const { error: insertError } = await supabase
-          .from('traits')
-          .insert([traitRow]);
+      saveLocalCustomTraits(authState.user.id, nextCustomTraits);
 
-        if (insertError && !insertError.message.toLowerCase().includes('duplicate')) {
-          throw insertError;
-        }
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ custom_traits: nextCustomTraits })
+        .eq('id', authState.user.id);
+
+      if (profileError && !profileError.message.toLowerCase().includes('custom_traits')) {
+        throw profileError;
       }
 
       const freshUser = await loadCurrentUserProfile(authState.user.id);
-      if (freshUser) {
-        setAuthState(prev => ({ ...prev, user: mergeStableUserState(freshUser, prev.user) }));
-      }
+      const fallbackTraits = mapSupabaseTraits(freshUser?.traits || authState.user.traits, nextCustomTraits);
+      setAuthState(prev => ({
+        ...prev,
+        user: prev.user
+          ? mergeStableUserState(
+              freshUser ? { ...freshUser, traits: fallbackTraits, custom_traits: nextCustomTraits } as any : { ...prev.user, traits: fallbackTraits, custom_traits: nextCustomTraits } as any,
+              prev.user
+            )
+          : null,
+      }));
       alert('Custom trait added.');
     } catch (err: any) {
       alert(err.message || 'Failed to save custom trait.');
