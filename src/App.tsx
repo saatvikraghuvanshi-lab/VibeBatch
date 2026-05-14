@@ -43,6 +43,21 @@ import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage }
 import { getStore, saveStore } from '../lib/store';
 import { generateIdentityTitle, generatePersonalityDescription } from '../lib/gemini';
 import vbLogo from './assets/vb-logo.png';
+import premiumBg01 from './assets/premium-backgrounds/premium-bg-01.jpeg';
+import premiumBg02 from './assets/premium-backgrounds/premium-bg-02.jpeg';
+import premiumBg03 from './assets/premium-backgrounds/premium-bg-03.jpeg';
+import premiumBg04 from './assets/premium-backgrounds/premium-bg-04.jpeg';
+import premiumBg05 from './assets/premium-backgrounds/premium-bg-05.jpeg';
+import premiumBg06 from './assets/premium-backgrounds/premium-bg-06.jpeg';
+import premiumBg07 from './assets/premium-backgrounds/premium-bg-07.jpeg';
+import premiumBg08 from './assets/premium-backgrounds/premium-bg-08.jpeg';
+import premiumBg09 from './assets/premium-backgrounds/premium-bg-09.jpeg';
+import premiumBg10 from './assets/premium-backgrounds/premium-bg-10.jpeg';
+import premiumBg11 from './assets/premium-backgrounds/premium-bg-11.jpeg';
+import premiumBg12 from './assets/premium-backgrounds/premium-bg-12.jpeg';
+import premiumBg13 from './assets/premium-backgrounds/premium-bg-13.jpeg';
+import premiumBg14 from './assets/premium-backgrounds/premium-bg-14.jpeg';
+import premiumBg15 from './assets/premium-backgrounds/premium-bg-15.jpeg';
 
 // --- Components ---
 
@@ -121,6 +136,23 @@ const isPremiumProfile = (profile: any) => Boolean(
   isPremiumIdentifier(profile?.displayName)
 );
 const isPremiumUser = (user?: UserProfile | null) => Boolean(user && isPremiumProfile(user));
+const PREMIUM_STORY_BACKGROUNDS = [
+  premiumBg01,
+  premiumBg02,
+  premiumBg03,
+  premiumBg04,
+  premiumBg05,
+  premiumBg06,
+  premiumBg07,
+  premiumBg08,
+  premiumBg09,
+  premiumBg10,
+  premiumBg11,
+  premiumBg12,
+  premiumBg13,
+  premiumBg14,
+  premiumBg15,
+];
 
 const isEligibleLength = (value?: string) => (
   FRIENDSHIP_LENGTH_OPTIONS.some(option => option.value === value && option.eligible)
@@ -1672,7 +1704,7 @@ export default function App() {
       { label: 'Traits', description: 'View your anonymous trait breakdown', icon: <Sparkles size={22} />, screen: 'traits' },
       { label: 'Eligibility', description: 'Check who can vote for your traits', icon: <Hourglass size={22} />, screen: 'hourglass' },
       { label: 'Vote Tracker', description: 'Track eligible, voted, and locked friends', icon: <BarChart3 size={22} />, screen: 'tracker' },
-      ...(isPremiumUser(user) ? [{ label: 'VibeBatch Premium', description: 'Premium insight cards and animated story cards', icon: <Crown size={22} />, screen: 'premium' }] : []),
+      ...(isPremiumUser(user) ? [{ label: 'VibeBatch Premium', description: 'Premium insight cards and story cards', icon: <Crown size={22} />, screen: 'premium' }] : []),
     ];
 
     return (
@@ -2926,6 +2958,18 @@ const downloadTextFile = (filename: string, content: string, type = 'text/html')
   URL.revokeObjectURL(link.href);
 };
 
+const imageUrlToDataUrl = async (url: string) => {
+  const response = await fetch(url);
+  const blob = await response.blob();
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result || ''));
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
 const wrapCanvasText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
   const words = String(text || '').split(/\s+/);
   const lines: string[] = [];
@@ -2955,34 +2999,12 @@ const buildLocalPersonalityDescription = (traits: Trait[] = []) => {
   return `Your presence blends ${names.join(', ')} into a profile that feels distinct and memorable. People seem to experience you as someone with a clear signature: expressive, intentional, and easy to recognize in a room.`;
 };
 
-const getTraitscapeStyle = (traits: Trait[] = []) => {
-  const names = getPositiveTraits(traits).slice(0, 3).map(trait => normalizeTraitName(trait.name)).join(' ');
-  const warm = names.includes('warm') || names.includes('caring') || names.includes('empathetic') || names.includes('supportive');
-  const bold = names.includes('leader') || names.includes('bold') || names.includes('confident') || names.includes('ambition');
-  const calm = names.includes('calm') || names.includes('zen') || names.includes('stable') || names.includes('grounded');
-
-  if (warm) {
-    return 'radial-gradient(circle at 20% 18%, rgba(233,137,208,.28), transparent 30%), radial-gradient(circle at 82% 34%, rgba(246,211,139,.16), transparent 28%), radial-gradient(circle at 50% 96%, rgba(220,199,255,.20), transparent 36%), linear-gradient(180deg, #2A183C 0%, #1E1231 58%, #160B25 100%)';
-  }
-
-  if (bold) {
-    return 'linear-gradient(135deg, rgba(233,137,208,.20), transparent 30%), radial-gradient(circle at 86% 18%, rgba(116,99,216,.30), transparent 32%), radial-gradient(circle at 18% 86%, rgba(220,199,255,.18), transparent 34%), linear-gradient(180deg, #2A183C 0%, #1E1231 58%, #160B25 100%)';
-  }
-
-  if (calm) {
-    return 'radial-gradient(ellipse at 50% 8%, rgba(220,199,255,.22), transparent 35%), radial-gradient(circle at 18% 72%, rgba(98,225,236,.12), transparent 30%), radial-gradient(circle at 88% 82%, rgba(116,99,216,.18), transparent 34%), linear-gradient(180deg, #2A183C 0%, #1E1231 58%, #160B25 100%)';
-  }
-
-  return 'radial-gradient(circle at 50% 0%, rgba(233,137,208,.24), transparent 42%), radial-gradient(circle at 95% 86%, rgba(116,99,216,.22), transparent 38%), radial-gradient(circle at 12% 74%, rgba(220,199,255,.16), transparent 34%), linear-gradient(180deg, #2A183C 0%, #1E1231 58%, #160B25 100%)';
-};
-
-const createPremiumStoryHtml = (user: UserProfile, description: string) => {
+const createPremiumStoryHtml = (user: UserProfile, description: string, backgroundImage: string) => {
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
   const avatar = escapeHtml(user.avatar || '');
   const username = escapeHtml(user.username ? `@${user.username}` : user.displayName);
   const title = escapeHtml(user.identityTitle || 'Identity Locked');
   const safeDescription = escapeHtml(description || buildLocalPersonalityDescription(user.traits));
-  const background = getTraitscapeStyle(user.traits);
   const traits = topTraits.map((trait, index) => `
     <div class="trait">
       <span>#${index + 1}</span>
@@ -3014,7 +3036,9 @@ const createPremiumStoryHtml = (user: UserProfile, description: string) => {
     overflow: hidden;
     border-radius: 34px;
     padding: 34px 32px 34px;
-    background: ${background};
+    background:
+      linear-gradient(180deg, rgba(16,8,28,.36), rgba(16,8,28,.58)),
+      url("${backgroundImage}") center / cover no-repeat;
     border: 1px solid rgba(220,199,255,.28);
     box-shadow: 0 28px 70px rgba(0,0,0,.45);
   }
@@ -3248,10 +3272,12 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
     link.click();
   };
 
-  const downloadAnimatedCard = () => {
+  const downloadPremiumStoryCard = async () => {
+    const randomBackground = PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)];
+    const backgroundDataUrl = await imageUrlToDataUrl(randomBackground);
     downloadTextFile(
       `vibebatch-premium-${user.username || 'story-card'}.html`,
-      createPremiumStoryHtml(user, description)
+      createPremiumStoryHtml(user, description, backgroundDataUrl)
     );
   };
 
@@ -3307,7 +3333,9 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
       <section>
         <div
           className="mx-auto w-full max-w-sm aspect-[9/16] rounded-[28px] border border-accent/25 p-6 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
-          style={{ background: getTraitscapeStyle(user.traits) }}
+          style={{
+            background: `linear-gradient(180deg, rgba(16,8,28,.36), rgba(16,8,28,.58)), url("${PREMIUM_STORY_BACKGROUNDS[0]}") center / cover no-repeat`
+          }}
         >
           <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.055)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.018)_0_1px,transparent_1px_16px)] pointer-events-none" />
           <div className="absolute top-4 right-4 gradient-button !py-1.5 !px-3 text-[8px] font-black uppercase tracking-widest z-10">Premium</div>
@@ -3337,8 +3365,8 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
             <p className="text-[8px] text-white/40 uppercase tracking-[0.22em] font-bold mt-1">Your Persona through a Digital Lens.</p>
           </div>
         </div>
-        <Button onClick={downloadAnimatedCard} variant="secondary" className="mt-4 max-w-sm mx-auto flex items-center justify-center gap-2">
-          <Download size={18} /> Download Animated Premium Card
+        <Button onClick={downloadPremiumStoryCard} variant="secondary" className="mt-4 max-w-sm mx-auto flex items-center justify-center gap-2">
+          <Download size={18} /> Download Premium Story Card
         </Button>
       </section>
     </div>
@@ -3550,7 +3578,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
   const downloadPremiumAnimatedStoryCard = async () => {
     const premium = isPremiumUser(user);
     if (!premium) {
-      alert('Premium animated story cards are available for VibeBatch Premium users.');
+      alert('Premium story cards are available for VibeBatch Premium users.');
       return;
     }
 
@@ -3561,9 +3589,12 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       description = buildLocalPersonalityDescription(user.traits);
     }
 
+    const randomBackground = PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)];
+    const backgroundDataUrl = await imageUrlToDataUrl(randomBackground);
+
     downloadTextFile(
       `vibebatch-premium-${user.username || 'story-card'}.html`,
-      createPremiumStoryHtml(user, description)
+      createPremiumStoryHtml(user, description, backgroundDataUrl)
     );
   };
   
@@ -3630,7 +3661,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
            <Download size={20} /> Download (Free)
         </Button>
         <button onClick={downloadPremiumAnimatedStoryCard} className="w-full p-4 rounded-xl border border-accent/30 text-accent font-bold text-sm flex items-center justify-center gap-2 bg-accent/5">
-           <Download size={18} /> Download Animated
+           <Download size={18} /> Download Premium Story Card
            <Badge color="accent" className="ml-2 scale-75">Premium</Badge>
         </button>
       </div>
