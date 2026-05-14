@@ -42,6 +42,7 @@ import {
 import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
 import { getStore, saveStore } from '../lib/store';
 import { generateIdentityTitle, generatePersonalityDescription } from '../lib/gemini';
+import vbLogo from './assets/vb-logo.jpeg';
 
 // --- Components ---
 
@@ -1132,25 +1133,34 @@ export default function App() {
   };
 
   const resetPassword = async () => {
-    const newPassword = window.prompt('Enter your new VibeBatch password');
-    if (!newPassword) return;
-
     setLoading(true);
     try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError || !authData.user) {
-        alert('Please log in again before changing your password.');
+      const { data: authData } = await supabase.auth.getUser();
+
+      if (authData.user) {
+        const newPassword = window.prompt('Enter your new VibeBatch password');
+        if (!newPassword) return;
+
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+
+        alert('New password set. Please log in again.');
+        await supabase.auth.signOut();
+        setAuthState({ user: null, isAuthenticated: false });
+        setCurrentScreen('login');
+        setIsProfileSheetOpen(false);
         return;
       }
 
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const email = window.prompt('Enter your account email');
+      if (!email?.trim()) return;
 
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin,
+      });
       if (error) throw error;
-      alert('New password set. Please log in again.');
-      await supabase.auth.signOut();
-      setAuthState({ user: null, isAuthenticated: false });
-      setCurrentScreen('login');
-      setIsProfileSheetOpen(false);
+
+      alert('Password reset link sent. Open it, set a new password, then log in again.');
     } catch (err: any) {
       alert(err.message || 'Failed to reset password.');
     } finally {
@@ -1292,7 +1302,12 @@ export default function App() {
   const AuthScreen = ({ onLogin, onSignup, onResetPassword, isLoginView, setIsLoginView, loading, avatarPreview, onAvatarChange }: any) => (
     <div className="min-h-screen flex flex-col p-6 max-w-md mx-auto w-full">
       <div className="flex-1 flex flex-col justify-center gap-8 py-12">
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-3">
+          <img
+            src={vbLogo}
+            alt="VibeBatch logo"
+            className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto rounded-2xl shadow-2xl shadow-accent/10"
+          />
           <h1 className="text-5xl font-display font-bold text-gradient tracking-tight">VibeBatch</h1>
           <p className="text-white/60 font-medium tracking-wide">Your Persona through a digital lens.</p>
         </div>
