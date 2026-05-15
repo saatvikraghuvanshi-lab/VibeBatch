@@ -1162,7 +1162,8 @@ export default function App() {
         .eq('user_id', authState.user.id)
         .eq('friend_id', friendId)
         .maybeSingle();
-      const ids = new Set(parseIdList(data?.[column]));
+      const moderationRow = data as Record<string, unknown> | null;
+      const ids = new Set(parseIdList(moderationRow?.[column]));
       if (enabled) ids.add(authState.user.id);
       else ids.delete(authState.user.id);
 
