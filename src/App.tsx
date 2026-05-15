@@ -248,6 +248,15 @@ const mergeStableUserState = (freshUser: UserProfile, previousUser?: UserProfile
 
   const freshHasVotes = getPositiveTraits(freshUser.traits).length > 0;
   const previousHasVotes = getPositiveTraits(previousUser.traits).length > 0;
+  const stableTraits = freshHasVotes || !previousHasVotes ? freshUser.traits : previousUser.traits;
+  const mergedTraitNames = new Set(stableTraits.map(trait => normalizeTraitName(trait.name)));
+  const mergedTraits = [...stableTraits];
+  [...freshUser.traits, ...previousUser.traits].forEach(trait => {
+    const traitKey = normalizeTraitName(trait.name);
+    if (trait.category !== 'custom' || !traitKey || mergedTraitNames.has(traitKey)) return;
+    mergedTraitNames.add(traitKey);
+    mergedTraits.push(trait);
+  });
   const freshFriends = freshUser.friends.length > 0 || previousUser.friends.length === 0
     ? freshUser.friends
     : previousUser.friends;
@@ -255,7 +264,7 @@ const mergeStableUserState = (freshUser: UserProfile, previousUser?: UserProfile
   return {
     ...freshUser,
     friends: freshFriends,
-    traits: freshHasVotes || !previousHasVotes ? freshUser.traits : previousUser.traits,
+    traits: mergedTraits,
     totalVotes: getTraitVoteTotal(freshUser.traits, freshUser.totalVotes) || previousUser.totalVotes,
   };
 };
