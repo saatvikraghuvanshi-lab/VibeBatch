@@ -1661,6 +1661,7 @@ export default function App() {
               <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
               <NavItem icon={<Hourglass size={20} />} active={currentScreen === 'hourglass'} onClick={() => setCurrentScreen('hourglass')} />
               <NavItem icon={<BarChart3 size={20} />} active={currentScreen === 'tracker'} onClick={() => setCurrentScreen('tracker')} />
+              <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'banners'} onClick={() => setCurrentScreen('banners')} />
               <NavItem icon={<Crown size={20} />} active={currentScreen === 'premium'} onClick={() => setCurrentScreen('premium')} />
             </div>
           </div>
@@ -1896,8 +1897,7 @@ export default function App() {
       { label: 'Traits', description: 'View your anonymous trait breakdown', icon: <Sparkles size={22} />, screen: 'traits' },
       { label: 'Eligibility', description: 'Check who can vote for your traits', icon: <Hourglass size={22} />, screen: 'hourglass' },
       { label: 'Vote Tracker', description: 'Track eligible, voted, and locked friends', icon: <BarChart3 size={22} />, screen: 'tracker' },
-      { label: 'Achievement Banners', description: 'See every vote milestone banner', icon: <Sparkles size={22} />, screen: 'achievement-banners' },
-      { label: 'Vibe Banners', description: isPremiumUser(user) ? 'View premium Vibe banners' : 'Preview premium Vibe banners', icon: <Crown size={22} />, screen: 'vibe-banners' },
+      { label: 'Banners', description: 'Achievement milestones and premium Vibe banners', icon: <Sparkles size={22} />, screen: 'banners' },
       { label: 'VibeBatch Premium', description: isPremiumUser(user) ? 'Premium insight cards and personality cards' : 'Plans, pricing, and premium features', icon: <Crown size={22} />, screen: 'premium' },
     ];
 
@@ -2011,12 +2011,8 @@ export default function App() {
             />
           )}
 
-          {currentScreen === 'achievement-banners' && authState.user && (
-            <AchievementBannersScreen user={authState.user} onBack={() => setCurrentScreen('home')} />
-          )}
-
-          {currentScreen === 'vibe-banners' && authState.user && (
-            <VibeBannersScreen user={authState.user} onBack={() => setCurrentScreen('home')} />
+          {currentScreen === 'banners' && authState.user && (
+            <BannersScreen user={authState.user} onBack={() => setCurrentScreen('home')} />
           )}
 
           {currentScreen === 'premium' && authState.user && (
@@ -2495,19 +2491,22 @@ function TraitsScreen({ onBack, user }: any) {
   );
 }
 
-function AchievementBannersScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
+function BannersScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
   const voteTotal = getTraitVoteTotal(user.traits, user.totalVotes);
+  const premium = isPremiumUser(user);
 
   return (
     <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
       <div className="flex items-center gap-4 mb-6">
         <button onClick={onBack}><ChevronLeft /></button>
         <div>
-          <h2 className="text-xl font-bold font-display">Achievement Banners</h2>
-          <p className="text-xs text-accent font-bold uppercase tracking-[0.18em] mt-1">Vote milestones</p>
+          <h2 className="text-xl font-bold font-display">Banners</h2>
+          <p className="text-xs text-accent font-bold uppercase tracking-[0.18em] mt-1">Achievements and Vibe visuals</p>
         </div>
       </div>
 
+      <section className="mb-10">
+        <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Achievement Banners</h3>
       <div className="card-surface p-4 mb-6 flex items-center justify-between gap-4">
         <div>
           <p className="text-[10px] uppercase tracking-widest text-white/40 font-black">Current votes</p>
@@ -2536,23 +2535,10 @@ function AchievementBannersScreen({ user, onBack }: { user: UserProfile; onBack:
           );
         })}
       </div>
-    </div>
-  );
-}
+      </section>
 
-function VibeBannersScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
-  const premium = isPremiumUser(user);
-
-  return (
-    <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={onBack}><ChevronLeft /></button>
-        <div>
-          <h2 className="text-xl font-bold font-display">Vibe Banners</h2>
-          <p className="text-xs text-accent font-bold uppercase tracking-[0.18em] mt-1">Premium profile visuals</p>
-        </div>
-      </div>
-
+      <section>
+      <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Vibe Banners</h3>
       {!premium && (
         <div className="card-surface p-5 mb-6 text-center">
           <p className="text-sm font-black uppercase tracking-widest text-accent mb-2">Buy Premium To Unlock These</p>
@@ -2578,6 +2564,7 @@ function VibeBannersScreen({ user, onBack }: { user: UserProfile; onBack: () => 
           </div>
         ))}
       </div>
+      </section>
     </div>
   );
 }
@@ -3221,8 +3208,7 @@ function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onUpdatePhoto, o
           <SheetOption icon={<Sparkles size={18} />} label="Manage custom traits" onClick={onManageCustomTraits} />
           <SheetOption icon={<Lock size={18} />} label="Reset password" onClick={() => onResetPassword()} />
           <SheetOption icon={<Download size={18} />} label="Download Story Card" onClick={() => onNavigate('storycard')} />
-          <SheetOption icon={<Sparkles size={18} />} label="Achievement Banners" onClick={() => onNavigate('achievement-banners')} />
-          <SheetOption icon={<Crown size={18} />} label="Vibe Banners" onClick={() => onNavigate('vibe-banners')} />
+          <SheetOption icon={<Sparkles size={18} />} label="Banners" onClick={() => onNavigate('banners')} />
           <SheetOption 
             icon={<Sparkles className="text-accent" size={18} />} 
             label="Regenerate Identity Title" 
