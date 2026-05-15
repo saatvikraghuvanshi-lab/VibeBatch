@@ -167,15 +167,15 @@ const PREMIUM_STORY_BACKGROUNDS = [
 ];
 const PREMIUM_BACKGROUND_KEY = 'vibebatch_last_premium_background';
 const ACHIEVEMENT_BANNERS = [
-  { name: 'Bronze', requirement: '10K votes', threshold: 10000, image: achievementBronze },
-  { name: 'Silver', requirement: '50K votes', threshold: 50000, image: achievementSilver },
-  { name: 'Gold', requirement: '100K votes', threshold: 100000, image: achievementGold },
-  { name: 'Platinum', requirement: '250K votes', threshold: 250000, image: achievementPlatinum },
-  { name: 'Diamond', requirement: '500K votes', threshold: 500000, image: achievementDiamond },
-  { name: 'Master', requirement: '1M votes', threshold: 1000000, image: achievementMaster },
-  { name: 'Legend', requirement: '5M votes', threshold: 5000000, image: achievementLegend },
-  { name: 'Mythic', requirement: '10M votes', threshold: 10000000, image: achievementMythic },
-  { name: 'Immortal', requirement: '500M+ votes', threshold: 500000000, image: achievementImmortal },
+  { name: 'Bronze', requirement: '10K views', threshold: 10000, image: achievementBronze },
+  { name: 'Silver', requirement: '50K views', threshold: 50000, image: achievementSilver },
+  { name: 'Gold', requirement: '100K views', threshold: 100000, image: achievementGold },
+  { name: 'Platinum', requirement: '250K views', threshold: 250000, image: achievementPlatinum },
+  { name: 'Diamond', requirement: '500K views', threshold: 500000, image: achievementDiamond },
+  { name: 'Master', requirement: '1M views', threshold: 1000000, image: achievementMaster },
+  { name: 'Legend', requirement: '5M views', threshold: 5000000, image: achievementLegend },
+  { name: 'Mythic', requirement: '10M views', threshold: 10000000, image: achievementMythic },
+  { name: 'Immortal', requirement: '50M+ views', threshold: 50000000, image: achievementImmortal },
 ];
 const VIBE_BANNERS = [
   { name: 'Vibe Banner I', image: vibeBannerOne },
@@ -775,8 +775,11 @@ export default function App() {
         username: profile.username || friend.username,
         displayName: profile.display_name || friend.displayName,
         avatar: profile.avatar_url || friend.avatar,
+        email: profile.email || (friend as any).email,
+        is_premium: profile.is_premium || (friend as any).is_premium,
+        isPremium: profile.isPremium || (friend as any).isPremium,
         traits: mapSupabaseTraits(traits, getProfileCustomTraits(profile)),
-      });
+      } as any);
     } catch (error) {
       console.warn('Could not refresh friend details:', error);
     }
@@ -1671,7 +1674,6 @@ export default function App() {
               <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
               <NavItem icon={<Hourglass size={20} />} active={currentScreen === 'hourglass'} onClick={() => setCurrentScreen('hourglass')} />
               <NavItem icon={<BarChart3 size={20} />} active={currentScreen === 'tracker'} onClick={() => setCurrentScreen('tracker')} />
-              <NavItem icon={<Flag size={20} />} active={currentScreen === 'banners'} onClick={() => setCurrentScreen('banners')} />
               <NavItem icon={<Crown size={20} />} active={currentScreen === 'premium'} onClick={() => setCurrentScreen('premium')} />
             </div>
           </div>
@@ -1844,25 +1846,6 @@ export default function App() {
                </div>
             </div>
 
-            <div className="metallic-panel rounded-2xl p-6 text-center space-y-6">
-               <p className="text-[10px] uppercase font-bold tracking-widest opacity-50">Share Story Card</p>
-               <div className="card-surface p-6 border-white/5 flex flex-col items-center">
-                  <div className="shimmer-ring w-12 h-12 rounded-full mb-3 overflow-hidden flex items-center justify-center">
-                    <div className="w-full h-full rounded-full overflow-hidden bg-surface flex items-center justify-center">
-                      {user.avatar ? <img src={user.avatar} className="w-full h-full object-cover" alt="" /> : <Sparkles className="text-accent/30" size={24} />}
-                    </div>
-                  </div>
-                  <p className="text-[10px] font-black uppercase text-accent truncate w-full text-center">
-                    {user.identityTitle || "Identity Locked"}
-                  </p>
-               </div>
-               <button 
-                onClick={() => setCurrentScreen('storycard')}
-                className="gradient-button w-full py-3 rounded-lg text-xs font-black tracking-widest uppercase"
-               >
-                Download (Free)
-               </button>
-            </div>
           </section>
         </main>
 
@@ -1907,7 +1890,6 @@ export default function App() {
       { label: 'Traits', description: 'View your anonymous trait breakdown', icon: <Sparkles size={22} />, screen: 'traits' },
       { label: 'Eligibility', description: 'Check who can vote for your traits', icon: <Hourglass size={22} />, screen: 'hourglass' },
       { label: 'Vote Tracker', description: 'Track eligible, voted, and locked friends', icon: <BarChart3 size={22} />, screen: 'tracker' },
-      { label: 'Banners', description: 'Achievement milestones and premium Vibe banners', icon: <Flag size={22} />, screen: 'banners' },
       { label: 'VibeBatch Premium', description: isPremiumUser(user) ? 'Premium insight cards and personality cards' : 'Plans, pricing, and premium features', icon: <Crown size={22} />, screen: 'premium' },
     ];
 
@@ -2019,10 +2001,6 @@ export default function App() {
               onUpdateFriendshipLength={updateFriendshipLength}
               onVote={(friend: Friend) => openVotingScreen(friend, 'tracker')}
             />
-          )}
-
-          {currentScreen === 'banners' && authState.user && (
-            <BannersScreen user={authState.user} onBack={() => setCurrentScreen('home')} />
           )}
 
           {currentScreen === 'premium' && authState.user && (
@@ -2149,6 +2127,8 @@ function FriendDetailsModal({ friend, onClose }: any) {
     .sort((a: Trait, b: Trait) => (b.votes || 0) - (a.votes || 0))
     .filter((trait: Trait) => (trait.votes || 0) > 0)
     .slice(0, 3);
+  const premiumFriend = isPremiumUser(friend);
+  const [traitsBackground] = useState(() => getNextPremiumBackground());
 
   return (
     <motion.div
@@ -2187,16 +2167,23 @@ function FriendDetailsModal({ friend, onClose }: any) {
             </p>
           </div>
 
-          <div>
-            <p className="text-[9px] text-white/40 font-black uppercase tracking-widest mb-3">Top traits</p>
+          <div className={`relative overflow-hidden rounded-lg ${premiumFriend ? 'border border-accent/25 p-4' : ''}`}>
+            {premiumFriend && (
+              <>
+                <img src={traitsBackground} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-background/55" />
+                <div className="absolute inset-0 bg-gradient-to-br from-accent/10 via-background/20 to-background/60" />
+              </>
+            )}
+            <p className="relative z-10 text-[9px] text-white/50 font-black uppercase tracking-widest mb-3">Top traits</p>
             {topTraits.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
+              <div className="relative z-10 flex flex-wrap gap-2">
                 {topTraits.map((trait: Trait) => (
                   <Badge key={trait.id || trait.name} color="pink">{trait.name}</Badge>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-white/40">No voted traits yet.</p>
+              <p className="relative z-10 text-sm text-white/40">No voted traits yet.</p>
             )}
           </div>
         </div>
@@ -2501,33 +2488,26 @@ function TraitsScreen({ onBack, user }: any) {
   );
 }
 
-function BannersScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
-  const voteTotal = getTraitVoteTotal(user.traits, user.totalVotes);
-  const premium = isPremiumUser(user);
+function AchievementBannerPanel({ user }: { user: UserProfile }) {
+  const viewTotal = getTraitVoteTotal(user.traits, user.totalVotes);
 
   return (
-    <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={onBack}><ChevronLeft /></button>
-        <div>
-          <h2 className="text-xl font-bold font-display">Banners</h2>
-          <p className="text-xs text-accent font-bold uppercase tracking-[0.18em] mt-1">Achievements and Vibe visuals</p>
-        </div>
+    <section className="space-y-4">
+      <div>
+        <h3 className="text-sm font-black uppercase tracking-widest text-white/70">Achievement Card</h3>
+        <p className="text-xs text-white/45 mt-1">Unlock achievement banners based on profile views.</p>
       </div>
-
-      <section className="mb-10">
-        <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Achievement Banners</h3>
       <div className="card-surface p-4 mb-6 flex items-center justify-between gap-4">
         <div>
-          <p className="text-[10px] uppercase tracking-widest text-white/40 font-black">Current votes</p>
-          <p className="text-2xl font-black font-display text-accent">{voteTotal.toLocaleString()}</p>
+          <p className="text-[10px] uppercase tracking-widest text-white/40 font-black">Current views</p>
+          <p className="text-2xl font-black font-display text-accent">{viewTotal.toLocaleString()}</p>
         </div>
         <Badge color="accent">All users</Badge>
       </div>
 
       <div className="grid gap-4">
         {ACHIEVEMENT_BANNERS.map(banner => {
-          const unlocked = voteTotal >= banner.threshold;
+          const unlocked = viewTotal >= banner.threshold;
           return (
             <div key={banner.name} className="card-surface overflow-hidden">
               <div className="relative aspect-[3/1] bg-background">
@@ -2545,10 +2525,19 @@ function BannersScreen({ user, onBack }: { user: UserProfile; onBack: () => void
           );
         })}
       </div>
-      </section>
+    </section>
+  );
+}
 
-      <section>
-      <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Vibe Banners</h3>
+function VibeBannerPanel({ user }: { user: UserProfile }) {
+  const premium = isPremiumUser(user);
+
+  return (
+    <section className="space-y-4">
+      <div>
+        <h3 className="text-sm font-black uppercase tracking-widest text-white/70">Vibe Banner</h3>
+        <p className="text-xs text-white/45 mt-1">Premium visual banners for your VibeBatch profile.</p>
+      </div>
       {!premium && (
         <div className="card-surface p-5 mb-6 text-center">
           <p className="text-sm font-black uppercase tracking-widest text-accent mb-2">Buy Premium To Unlock These</p>
@@ -2574,8 +2563,7 @@ function BannersScreen({ user, onBack }: { user: UserProfile; onBack: () => void
           </div>
         ))}
       </div>
-      </section>
-    </div>
+    </section>
   );
 }
 
@@ -3218,7 +3206,6 @@ function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onUpdatePhoto, o
           <SheetOption icon={<Sparkles size={18} />} label="Manage custom traits" onClick={onManageCustomTraits} />
           <SheetOption icon={<Lock size={18} />} label="Reset password" onClick={() => onResetPassword()} />
           <SheetOption icon={<Download size={18} />} label="Download Story Card" onClick={() => onNavigate('storycard')} />
-          <SheetOption icon={<Flag size={18} />} label="Banners" onClick={() => onNavigate('banners')} />
           <SheetOption 
             icon={<Sparkles className="text-accent" size={18} />} 
             label="Regenerate Identity Title" 
@@ -3535,6 +3522,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
   const [description, setDescription] = useState(buildLocalPersonalityDescription(user.traits));
   const [previewBackground, setPreviewBackground] = useState(() => PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)] || PREMIUM_STORY_BACKGROUNDS[0]);
   const [hintsBackground] = useState(() => getNextPremiumBackground());
+  const [activePremiumPanel, setActivePremiumPanel] = useState<'hints' | 'card' | 'achievements' | 'vibes'>('hints');
   const votedFriends = user.friends.filter(friend => friend.hasVoted);
   const hints = votedFriends.slice(0, 6).map((friend, index) => ({
     id: friend.id,
@@ -3601,6 +3589,8 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
               'Shared top-trait clues when you and a friend have a top trait in common.',
               'AI-made personality insight based on your voted traits.',
               'Premium personality card with visual backgrounds and stacked top traits.',
+              'Achievement banners based on profile views.',
+              'Premium Vibe banners for profile visuals.',
               'Downloadable premium card for sharing outside VibeBatch.',
             ].map(feature => (
               <div key={feature} className="flex items-start gap-3 rounded-xl bg-background/40 border border-accent/15 p-3">
@@ -3624,68 +3614,93 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
         </div>
       </div>
 
-      <section className="card-surface p-5 mb-8 relative overflow-hidden">
-        <img src={hintsBackground} alt="" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-background/55" />
-        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-background/15 to-background/60" />
-        <h3 className="relative z-10 text-sm font-black uppercase tracking-widest text-white/70 mb-4">Anonymous Trait Hints</h3>
-        <div className="relative z-10 space-y-3">
-          {hints.length > 0 ? hints.map((hint, index) => (
-            <div key={`${hint.id}-${index}`} className="flex items-center justify-between gap-4 bg-background/70 border border-accent/25 rounded-xl p-3 shadow-lg shadow-black/15">
-              <div className="min-w-0">
-                <p className="text-xs text-white/55 font-bold uppercase tracking-widest">Anonymous friend signal</p>
-                <p className="font-bold truncate">{hint.duration}</p>
-                {hint.sharedTrait && (
-                  <p className="text-xs text-accent/80 font-bold mt-1">Shared top trait: {hint.sharedTrait}</p>
-                )}
-              </div>
-              <Badge color="accent">{hint.trait}</Badge>
-            </div>
-          )) : (
-            <p className="text-sm text-white/45">Anonymous hints appear after eligible friends vote.</p>
-          )}
-        </div>
-      </section>
+      <div className="grid grid-cols-4 gap-3 mb-8">
+        {[
+          { id: 'hints', label: 'Hints', icon: <EyeOff size={20} /> },
+          { id: 'card', label: 'Card', icon: <Download size={20} /> },
+          { id: 'achievements', label: 'Achievements', icon: <Flag size={20} /> },
+          { id: 'vibes', label: 'Vibes', icon: <Crown size={20} /> },
+        ].map(item => (
+          <button
+            key={item.id}
+            onClick={() => setActivePremiumPanel(item.id as typeof activePremiumPanel)}
+            className={`card-surface min-h-[88px] p-3 flex flex-col items-center justify-center gap-2 text-center transition-all ${activePremiumPanel === item.id ? 'border-accent/60 bg-accent/10 text-accent glowing-accent' : 'text-white/55 hover:text-white hover:border-accent/30'}`}
+          >
+            {item.icon}
+            <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+          </button>
+        ))}
+      </div>
 
-      <section>
-        <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Personality Card</h3>
-        <div
-          className="mx-auto w-full max-w-[340px] aspect-[9/16] rounded-[28px] border border-accent/25 p-5 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
-        >
-          <img src={previewBackground} alt="" className="absolute inset-0 w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/25 to-background/55 pointer-events-none" />
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.04)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.012)_0_1px,transparent_1px_16px)] pointer-events-none" />
-          <div className="gradient-button !py-1 !px-5 text-[8px] font-black uppercase tracking-widest z-10 mt-6">Premium</div>
-          {user.avatar ? (
-            <img src={user.avatar} className="w-20 h-20 rounded-full object-cover border-4 border-accent mt-4 relative z-10" alt="" />
-          ) : (
-            <div className="w-20 h-20 rounded-full bg-surface border border-accent/30 flex items-center justify-center mt-4 relative z-10">
-              <Crown size={24} />
-            </div>
-          )}
-          <div className="text-center mt-4 relative z-10 w-full min-w-0">
-            <p className="text-[clamp(1rem,4.8vw,1.35rem)] leading-tight font-black font-display truncate px-1">{user.username ? `@${user.username}` : user.displayName}</p>
-            <div className="inline-block max-w-full gradient-button !py-1.5 !px-4 mt-2 text-[8px] font-black uppercase tracking-[0.12em] truncate">{user.identityTitle || 'Identity Locked'}</div>
-          </div>
-          <p className="relative z-10 mt-6 text-[10px] font-black tracking-widest uppercase text-accent">Your Vibe</p>
-          <p className="relative z-10 text-[10px] sm:text-[11px] text-white/90 leading-relaxed text-center mt-2 px-1">{description}</p>
-          <div className="relative z-10 w-full mt-3 space-y-2">
-            {topTraits.map((trait, index) => (
-              <div key={trait.id || trait.name} className="flex items-center gap-3 rounded-xl bg-surface/90 border border-accent/50 px-4 py-2.5">
-                <span className="text-[10px] font-black text-accent w-8">#{index + 1}</span>
-                <span className="text-[11px] font-black text-white truncate">{trait.name}</span>
+      {activePremiumPanel === 'hints' && (
+        <section className="card-surface p-5 mb-8 relative overflow-hidden">
+          <img src={hintsBackground} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-background/55" />
+          <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-background/15 to-background/60" />
+          <h3 className="relative z-10 text-sm font-black uppercase tracking-widest text-white/70 mb-4">Anonymous Trait Hints</h3>
+          <div className="relative z-10 space-y-3">
+            {hints.length > 0 ? hints.map((hint, index) => (
+              <div key={`${hint.id}-${index}`} className="flex items-center justify-between gap-4 bg-background/70 border border-accent/25 rounded-xl p-3 shadow-lg shadow-black/15">
+                <div className="min-w-0">
+                  <p className="text-xs text-white/55 font-bold uppercase tracking-widest">Anonymous friend signal</p>
+                  <p className="font-bold truncate">{hint.duration}</p>
+                  {hint.sharedTrait && (
+                    <p className="text-xs text-accent/80 font-bold mt-1">Shared top trait: {hint.sharedTrait}</p>
+                  )}
+                </div>
+                <Badge color="accent">{hint.trait}</Badge>
               </div>
-            ))}
+            )) : (
+              <p className="relative z-10 text-sm text-white/55">Anonymous hints appear after eligible friends vote.</p>
+            )}
           </div>
-          <div className="relative z-10 mt-auto pt-3 text-center">
-            <p className="text-xl font-black font-display">VibeBatch</p>
-            <p className="text-[8px] text-white/40 uppercase tracking-[0.22em] font-bold mt-1">Your Persona through a Digital Lens.</p>
+        </section>
+      )}
+
+      {activePremiumPanel === 'card' && (
+        <section>
+          <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Personality Card</h3>
+          <div
+            className="mx-auto w-full max-w-[340px] aspect-[9/16] rounded-[28px] border border-accent/25 p-5 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
+          >
+            <img src={previewBackground} alt="" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/25 to-background/55 pointer-events-none" />
+            <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.04)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.012)_0_1px,transparent_1px_16px)] pointer-events-none" />
+            <div className="gradient-button !py-1 !px-5 text-[8px] font-black uppercase tracking-widest z-10 mt-6">Premium</div>
+            {user.avatar ? (
+              <img src={user.avatar} className="w-20 h-20 rounded-full object-cover border-4 border-accent mt-4 relative z-10" alt="" />
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-surface border border-accent/30 flex items-center justify-center mt-4 relative z-10">
+                <Crown size={24} />
+              </div>
+            )}
+            <div className="text-center mt-4 relative z-10 w-full min-w-0">
+              <p className="text-[clamp(1rem,4.8vw,1.35rem)] leading-tight font-black font-display truncate px-1">{user.username ? `@${user.username}` : user.displayName}</p>
+              <div className="inline-block max-w-full gradient-button !py-1.5 !px-4 mt-2 text-[8px] font-black uppercase tracking-[0.12em] truncate">{user.identityTitle || 'Identity Locked'}</div>
+            </div>
+            <p className="relative z-10 mt-6 text-[10px] font-black tracking-widest uppercase text-accent">Your Vibe</p>
+            <p className="relative z-10 text-[10px] sm:text-[11px] text-white/90 leading-relaxed text-center mt-2 px-1">{description}</p>
+            <div className="relative z-10 w-full mt-3 space-y-2">
+              {topTraits.map((trait, index) => (
+                <div key={trait.id || trait.name} className="flex items-center gap-3 rounded-xl bg-surface/90 border border-accent/50 px-4 py-2.5">
+                  <span className="text-[10px] font-black text-accent w-8">#{index + 1}</span>
+                  <span className="text-[11px] font-black text-white truncate">{trait.name}</span>
+                </div>
+              ))}
+            </div>
+            <div className="relative z-10 mt-auto pt-3 text-center">
+              <p className="text-xl font-black font-display">VibeBatch</p>
+              <p className="text-[8px] text-white/40 uppercase tracking-[0.22em] font-bold mt-1">Your Persona through a Digital Lens.</p>
+            </div>
           </div>
-        </div>
-        <Button onClick={downloadPremiumStoryCard} variant="secondary" className="mt-4 max-w-sm mx-auto flex items-center justify-center gap-2">
-          <Download size={18} /> Download Personality Card
-        </Button>
-      </section>
+          <Button onClick={downloadPremiumStoryCard} variant="secondary" className="mt-4 max-w-sm mx-auto flex items-center justify-center gap-2">
+            <Download size={18} /> Download Personality Card
+          </Button>
+        </section>
+      )}
+
+      {activePremiumPanel === 'achievements' && <AchievementBannerPanel user={user} />}
+      {activePremiumPanel === 'vibes' && <VibeBannerPanel user={user} />}
     </div>
   );
 }
