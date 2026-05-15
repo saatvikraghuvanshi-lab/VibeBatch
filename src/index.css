@@ -80,6 +80,19 @@
   pointer-events: none;
 }
 
+.identity-title-pill {
+  position: relative;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid rgba(220, 199, 255, 0.38);
+  background:
+    linear-gradient(115deg, rgba(255, 255, 255, 0.14), transparent 32% 72%, rgba(255, 255, 255, 0.08)),
+    linear-gradient(135deg, rgba(233, 137, 208, 0.78), rgba(199, 162, 248, 0.72) 42%, rgba(116, 99, 216, 0.72));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 10px 24px rgba(73, 48, 120, 0.16);
+}
+
 .card-surface {
   @apply rounded-[var(--radius-card)] border;
   position: relative;

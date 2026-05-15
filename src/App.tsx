@@ -1692,7 +1692,7 @@ export default function App() {
               </div>
               {user.identityTitle ? (
                 <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
-                   <div className="px-5 py-2 text-[10px] whitespace-nowrap gradient-button text-white font-black rounded-full uppercase tracking-wider">
+                   <div className="identity-title-pill px-5 py-2 text-[10px] whitespace-nowrap text-white font-black uppercase tracking-wider">
                      {user.identityTitle}
                    </div>
                 </div>
@@ -1735,7 +1735,7 @@ export default function App() {
                     </div>
                   )}
                   {user.identityTitle ? (
-                    <div className="max-w-[min(22rem,calc(100vw-4rem))] text-center gradient-button text-white text-[9px] font-black px-4 py-1.5 rounded-lg uppercase tracking-wider truncate">
+                    <div className="identity-title-pill max-w-[min(22rem,calc(100vw-4rem))] text-center text-white text-[9px] font-black px-4 py-1.5 uppercase tracking-wider truncate">
                       {user.identityTitle}
                     </div>
                   ) : (
@@ -2488,26 +2488,17 @@ function TraitsScreen({ onBack, user }: any) {
   );
 }
 
-function AchievementBannerPanel({ user }: { user: UserProfile }) {
-  const viewTotal = getTraitVoteTotal(user.traits, user.totalVotes);
-
+function AchievementBannerPanel() {
   return (
     <section className="space-y-4">
       <div>
         <h3 className="text-sm font-black uppercase tracking-widest text-white/70">Achievement Card</h3>
         <p className="text-xs text-white/45 mt-1">Unlock achievement banners based on profile views.</p>
       </div>
-      <div className="card-surface p-4 mb-6 flex items-center justify-between gap-4">
-        <div>
-          <p className="text-[10px] uppercase tracking-widest text-white/40 font-black">Current views</p>
-          <p className="text-2xl font-black font-display text-accent">{viewTotal.toLocaleString()}</p>
-        </div>
-        <Badge color="accent">All users</Badge>
-      </div>
 
       <div className="grid gap-4">
         {ACHIEVEMENT_BANNERS.map(banner => {
-          const unlocked = viewTotal >= banner.threshold;
+          const unlocked = false;
           return (
             <div key={banner.name} className="card-surface overflow-hidden">
               <div className="relative aspect-[3/1] bg-background">
@@ -3614,7 +3605,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-8">
         {[
           { id: 'hints', label: 'Hints', icon: <EyeOff size={20} /> },
           { id: 'card', label: 'Card', icon: <Download size={20} /> },
@@ -3624,10 +3615,10 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
           <button
             key={item.id}
             onClick={() => setActivePremiumPanel(item.id as typeof activePremiumPanel)}
-            className={`card-surface min-h-[88px] p-3 flex flex-col items-center justify-center gap-2 text-center transition-all ${activePremiumPanel === item.id ? 'border-accent/60 bg-accent/10 text-accent glowing-accent' : 'text-white/55 hover:text-white hover:border-accent/30'}`}
+            className={`card-surface min-h-[84px] sm:min-h-[88px] px-1.5 py-3 flex flex-col items-center justify-center gap-2 text-center transition-all overflow-hidden ${activePremiumPanel === item.id ? 'border-accent/60 bg-accent/10 text-accent glowing-accent' : 'text-white/55 hover:text-white hover:border-accent/30'}`}
           >
             {item.icon}
-            <span className="text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+            <span className="max-w-full text-[7px] sm:text-[10px] font-black uppercase tracking-[0.08em] sm:tracking-widest leading-tight break-words">{item.label}</span>
           </button>
         ))}
       </div>
@@ -3699,7 +3690,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
         </section>
       )}
 
-      {activePremiumPanel === 'achievements' && <AchievementBannerPanel user={user} />}
+      {activePremiumPanel === 'achievements' && <AchievementBannerPanel />}
       {activePremiumPanel === 'vibes' && <VibeBannerPanel user={user} />}
     </div>
   );
@@ -3827,12 +3818,6 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
     ctx.fillStyle = '#1E1231';
     ctx.fillText(title.toUpperCase(), canvas.width / 2, 758, titleWidth - 56);
 
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 12;
-    ctx.beginPath();
-    ctx.arc(canvas.width / 2, 430, 150, 0, Math.PI * 2);
-    ctx.stroke();
-
     if (user.avatar) {
       try {
         const image = new Image();
@@ -3846,7 +3831,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
         ctx.beginPath();
         ctx.arc(canvas.width / 2, 430, 138, 0, Math.PI * 2);
         ctx.clip();
-        ctx.drawImage(image, canvas.width / 2 - 138, 292, 276, 276);
+        drawCoverImage(ctx, image, canvas.width / 2 - 138, 292, 276, 276);
         ctx.restore();
       } catch {
         ctx.fillStyle = 'rgba(255,255,255,0.08)';
@@ -3856,16 +3841,20 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
       }
     }
 
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, 430, 150, 0, Math.PI * 2);
+    ctx.stroke();
+
     if (hasVotes) topTraits.forEach((trait, index) => {
       const y = 890 + index * 154;
-      const traitGradient = ctx.createLinearGradient(170, y, 910, y + 124);
-      traitGradient.addColorStop(0, index === 0 ? 'rgba(233,137,208,0.22)' : 'rgba(220,199,255,0.13)');
-      traitGradient.addColorStop(1, 'rgba(43,26,61,0.76)');
-      ctx.fillStyle = traitGradient;
+      ctx.fillStyle = 'rgba(43,26,61,0.86)';
+      ctx.beginPath();
       ctx.roundRect(150, y, 780, 124, 28);
       ctx.fill();
-      ctx.strokeStyle = 'rgba(220,199,255,0.24)';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(220,199,255,0.46)';
+      ctx.lineWidth = 3;
       ctx.stroke();
       ctx.fillStyle = accent;
       ctx.font = '900 28px Inter, Arial';
@@ -3931,7 +3920,7 @@ function StoryCardGeneratorScreen({ user, onBack }: any) {
              <div className="text-center space-y-3">
                <h3 className="text-2xl font-bold font-display tracking-tight">{user.username ? `@${user.username}` : (user.displayName || "Your Name")}</h3>
                {user.identityTitle ? (
-                 <div className="inline-block gradient-button !py-1.5 !px-4 text-[9px] font-black uppercase tracking-[0.1em]">
+                  <div className="inline-block identity-title-pill !py-1.5 !px-4 text-[9px] font-black uppercase tracking-[0.1em]">
                    {user.identityTitle}
                  </div>
                ) : (
