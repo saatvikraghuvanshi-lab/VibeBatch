@@ -3200,14 +3200,27 @@ const loadCleanCanvasImage = async (src?: string) => {
 };
 
 const downloadCanvasAsPng = (canvas: HTMLCanvasElement, filename: string) => {
-  canvas.toBlob(blob => {
-    if (!blob) return;
+  const clickLink = (href: string, revoke = false) => {
     const link = document.createElement('a');
     link.download = filename;
-    link.href = URL.createObjectURL(blob);
+    link.href = href;
+    link.style.display = 'none';
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(link.href);
-  }, 'image/png');
+    window.setTimeout(() => {
+      link.remove();
+      if (revoke) URL.revokeObjectURL(href);
+    }, 1000);
+  };
+
+  try {
+    clickLink(canvas.toDataURL('image/png'));
+  } catch {
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      clickLink(URL.createObjectURL(blob), true);
+    }, 'image/png');
+  }
 };
 
 const wrapCanvasText = (ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) => {
@@ -3287,13 +3300,16 @@ const downloadPremiumStoryCardPng = async (user: UserProfile, description: strin
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
 
-  const bgImage = await loadCanvasImage(background);
+  const bgImage = await loadCleanCanvasImage(background);
+  if (!bgImage) {
+    throw new Error('Premium background could not be loaded.');
+  }
   drawCoverImage(ctx, bgImage, 0, 0, canvas.width, canvas.height);
 
   const overlay = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  overlay.addColorStop(0, 'rgba(16,8,28,0.22)');
-  overlay.addColorStop(0.52, 'rgba(16,8,28,0.42)');
-  overlay.addColorStop(1, 'rgba(16,8,28,0.62)');
+  overlay.addColorStop(0, 'rgba(16,8,28,0.14)');
+  overlay.addColorStop(0.52, 'rgba(16,8,28,0.28)');
+  overlay.addColorStop(1, 'rgba(16,8,28,0.52)');
   ctx.fillStyle = overlay;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -3425,7 +3441,12 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
   const downloadPremiumStoryCard = async () => {
     const background = getNextPremiumBackground();
     setPreviewBackground(background);
-    await downloadPremiumStoryCardPng(user, description, background);
+    try {
+      await downloadPremiumStoryCardPng(user, description, background);
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || 'Could not download the personality card.');
+    }
   };
 
   if (!premium) {
@@ -3505,11 +3526,10 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
         <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Personality Card</h3>
         <div
           className="mx-auto w-full max-w-[340px] aspect-[9/16] rounded-[28px] border border-accent/25 p-5 flex flex-col items-center shadow-2xl shadow-black/25 relative overflow-hidden"
-          style={{
-            background: `linear-gradient(180deg, rgba(16,8,28,.18), rgba(16,8,28,.46)), url("${previewBackground}") center / cover no-repeat`
-          }}
         >
-          <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.055)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.018)_0_1px,transparent_1px_16px)] pointer-events-none" />
+          <img src={previewBackground} alt="" className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/10 via-background/25 to-background/55 pointer-events-none" />
+          <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.04)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.012)_0_1px,transparent_1px_16px)] pointer-events-none" />
           <div className="gradient-button !py-1 !px-5 text-[8px] font-black uppercase tracking-widest z-10 mt-6">Premium</div>
           {user.avatar ? (
             <img src={user.avatar} className="w-20 h-20 rounded-full object-cover border-4 border-accent mt-4 relative z-10" alt="" />
