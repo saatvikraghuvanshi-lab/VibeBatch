@@ -58,6 +58,17 @@ import premiumBg12 from './assets/premium-backgrounds/premium-bg-12.jpeg';
 import premiumBg13 from './assets/premium-backgrounds/premium-bg-13.jpeg';
 import premiumBg14 from './assets/premium-backgrounds/premium-bg-14.jpeg';
 import premiumBg15 from './assets/premium-backgrounds/premium-bg-15.jpeg';
+import achievementBronze from './assets/banners/achievement-bronze.jpg';
+import achievementSilver from './assets/banners/achievement-silver.jpg';
+import achievementGold from './assets/banners/achievement-gold.jpg';
+import achievementPlatinum from './assets/banners/achievement-platinum.jpg';
+import achievementDiamond from './assets/banners/achievement-diamond.jpg';
+import achievementMaster from './assets/banners/achievement-master.jpg';
+import achievementLegend from './assets/banners/achievement-legend.jpg';
+import achievementMythic from './assets/banners/achievement-mythic.jpg';
+import achievementImmortal from './assets/banners/achievement-immortal.jpg';
+import vibeBannerOne from './assets/banners/vibe-banner-1.jpg';
+import vibeBannerTwo from './assets/banners/vibe-banner-2.jpg';
 
 // --- Components ---
 
@@ -154,6 +165,21 @@ const PREMIUM_STORY_BACKGROUNDS = [
   premiumBg15,
 ];
 const PREMIUM_BACKGROUND_KEY = 'vibebatch_last_premium_background';
+const ACHIEVEMENT_BANNERS = [
+  { name: 'Bronze', requirement: '10K votes', threshold: 10000, image: achievementBronze },
+  { name: 'Silver', requirement: '50K votes', threshold: 50000, image: achievementSilver },
+  { name: 'Gold', requirement: '100K votes', threshold: 100000, image: achievementGold },
+  { name: 'Platinum', requirement: '250K votes', threshold: 250000, image: achievementPlatinum },
+  { name: 'Diamond', requirement: '500K votes', threshold: 500000, image: achievementDiamond },
+  { name: 'Master', requirement: '1M votes', threshold: 1000000, image: achievementMaster },
+  { name: 'Legend', requirement: '5M votes', threshold: 5000000, image: achievementLegend },
+  { name: 'Mythic', requirement: '10M votes', threshold: 10000000, image: achievementMythic },
+  { name: 'Immortal', requirement: '500M+ votes', threshold: 500000000, image: achievementImmortal },
+];
+const VIBE_BANNERS = [
+  { name: 'Vibe Banner I', image: vibeBannerOne },
+  { name: 'Vibe Banner II', image: vibeBannerTwo },
+];
 
 const getNextPremiumBackground = () => {
   const lastIndex = Number(window.localStorage.getItem(PREMIUM_BACKGROUND_KEY) || '-1');
@@ -1870,6 +1896,8 @@ export default function App() {
       { label: 'Traits', description: 'View your anonymous trait breakdown', icon: <Sparkles size={22} />, screen: 'traits' },
       { label: 'Eligibility', description: 'Check who can vote for your traits', icon: <Hourglass size={22} />, screen: 'hourglass' },
       { label: 'Vote Tracker', description: 'Track eligible, voted, and locked friends', icon: <BarChart3 size={22} />, screen: 'tracker' },
+      { label: 'Achievement Banners', description: 'See every vote milestone banner', icon: <Sparkles size={22} />, screen: 'achievement-banners' },
+      { label: 'Vibe Banners', description: isPremiumUser(user) ? 'View premium Vibe banners' : 'Preview premium Vibe banners', icon: <Crown size={22} />, screen: 'vibe-banners' },
       { label: 'VibeBatch Premium', description: isPremiumUser(user) ? 'Premium insight cards and personality cards' : 'Plans, pricing, and premium features', icon: <Crown size={22} />, screen: 'premium' },
     ];
 
@@ -1981,6 +2009,14 @@ export default function App() {
               onUpdateFriendshipLength={updateFriendshipLength}
               onVote={(friend: Friend) => openVotingScreen(friend, 'tracker')}
             />
+          )}
+
+          {currentScreen === 'achievement-banners' && authState.user && (
+            <AchievementBannersScreen user={authState.user} onBack={() => setCurrentScreen('home')} />
+          )}
+
+          {currentScreen === 'vibe-banners' && authState.user && (
+            <VibeBannersScreen user={authState.user} onBack={() => setCurrentScreen('home')} />
           )}
 
           {currentScreen === 'premium' && authState.user && (
@@ -2454,6 +2490,93 @@ function TraitsScreen({ onBack, user }: any) {
         <TraitCategory label="Custom Traits" traits={customTraits} total={effectiveTotalVotes} custom />
         <TraitCategory label="Predefined Traits" traits={unvotedPredefinedTraits} total={effectiveTotalVotes} />
         <TraitCategory label="Sponsored Traits" traits={unvotedSponsoredTraits} total={effectiveTotalVotes} sponsored />
+      </div>
+    </div>
+  );
+}
+
+function AchievementBannersScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
+  const voteTotal = getTraitVoteTotal(user.traits, user.totalVotes);
+
+  return (
+    <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
+      <div className="flex items-center gap-4 mb-6">
+        <button onClick={onBack}><ChevronLeft /></button>
+        <div>
+          <h2 className="text-xl font-bold font-display">Achievement Banners</h2>
+          <p className="text-xs text-accent font-bold uppercase tracking-[0.18em] mt-1">Vote milestones</p>
+        </div>
+      </div>
+
+      <div className="card-surface p-4 mb-6 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-[10px] uppercase tracking-widest text-white/40 font-black">Current votes</p>
+          <p className="text-2xl font-black font-display text-accent">{voteTotal.toLocaleString()}</p>
+        </div>
+        <Badge color="accent">All users</Badge>
+      </div>
+
+      <div className="grid gap-4">
+        {ACHIEVEMENT_BANNERS.map(banner => {
+          const unlocked = voteTotal >= banner.threshold;
+          return (
+            <div key={banner.name} className="card-surface overflow-hidden">
+              <div className="relative aspect-[3/1] bg-background">
+                <img src={banner.image} alt="" className={`w-full h-full object-cover ${unlocked ? '' : 'grayscale opacity-55'}`} />
+                <div className="absolute inset-0 bg-gradient-to-r from-background/78 via-background/22 to-transparent" />
+                <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                  <p className="text-2xl font-black font-display">{banner.name}</p>
+                  <p className="text-xs text-accent font-black uppercase tracking-widest mt-1">{banner.requirement}</p>
+                </div>
+                <div className="absolute right-4 top-4">
+                  <Badge color={unlocked ? 'green' : 'pink'}>{unlocked ? 'Unlocked' : 'Locked'}</Badge>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function VibeBannersScreen({ user, onBack }: { user: UserProfile; onBack: () => void }) {
+  const premium = isPremiumUser(user);
+
+  return (
+    <div className="min-h-screen p-4 pb-24 max-w-5xl mx-auto w-full">
+      <div className="flex items-center gap-4 mb-6">
+        <button onClick={onBack}><ChevronLeft /></button>
+        <div>
+          <h2 className="text-xl font-bold font-display">Vibe Banners</h2>
+          <p className="text-xs text-accent font-bold uppercase tracking-[0.18em] mt-1">Premium profile visuals</p>
+        </div>
+      </div>
+
+      {!premium && (
+        <div className="card-surface p-5 mb-6 text-center">
+          <p className="text-sm font-black uppercase tracking-widest text-accent mb-2">Buy Premium To Unlock These</p>
+          <p className="text-sm text-white/55 leading-relaxed">Vibe Banners are included with VibeBatch Premium.</p>
+        </div>
+      )}
+
+      <div className="grid gap-4">
+        {VIBE_BANNERS.map(banner => (
+          <div key={banner.name} className="card-surface overflow-hidden">
+            <div className="relative aspect-[3/1] bg-background">
+              <img src={banner.image} alt="" className={`w-full h-full object-cover ${premium ? '' : 'grayscale opacity-60'}`} />
+              {!premium && <div className="absolute inset-0 bg-background/30 backdrop-blur-[1px]" />}
+              <div className="absolute left-4 bottom-4">
+                <p className="text-lg font-black font-display">{banner.name}</p>
+              </div>
+              {!premium && (
+                <div className="absolute right-4 top-4">
+                  <Badge color="accent">Premium</Badge>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -3098,6 +3221,8 @@ function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onUpdatePhoto, o
           <SheetOption icon={<Sparkles size={18} />} label="Manage custom traits" onClick={onManageCustomTraits} />
           <SheetOption icon={<Lock size={18} />} label="Reset password" onClick={() => onResetPassword()} />
           <SheetOption icon={<Download size={18} />} label="Download Story Card" onClick={() => onNavigate('storycard')} />
+          <SheetOption icon={<Sparkles size={18} />} label="Achievement Banners" onClick={() => onNavigate('achievement-banners')} />
+          <SheetOption icon={<Crown size={18} />} label="Vibe Banners" onClick={() => onNavigate('vibe-banners')} />
           <SheetOption 
             icon={<Sparkles className="text-accent" size={18} />} 
             label="Regenerate Identity Title" 
