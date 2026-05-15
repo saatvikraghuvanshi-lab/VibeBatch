@@ -181,6 +181,18 @@ const VIBE_BANNERS = [
   { name: 'Vibe Banner I', image: vibeBannerOne },
   { name: 'Vibe Banner II', image: vibeBannerTwo },
 ];
+const getHomeVibeBannerKey = (userId?: string) => (
+  userId ? `vibebatch_home_vibe_banner_${userId}` : ''
+);
+const getHomeVibeBannerIndex = (userId?: string) => {
+  const key = getHomeVibeBannerKey(userId);
+  if (!key) return 0;
+  const parsed = Number(window.localStorage.getItem(key) || '0');
+  return Number.isFinite(parsed) && VIBE_BANNERS[parsed] ? parsed : 0;
+};
+const saveHomeVibeBannerIndex = (userId: string, index: number) => {
+  window.localStorage.setItem(getHomeVibeBannerKey(userId), String(index));
+};
 
 const getNextPremiumBackground = () => {
   const lastIndex = Number(window.localStorage.getItem(PREMIUM_BACKGROUND_KEY) || '-1');
@@ -1641,6 +1653,14 @@ export default function App() {
     const eligibleFriends = user.friends.filter(f => f.isVoteEligible && !f.hasVoted);
     const votedFriends = user.friends.filter(f => f.hasVoted);
     const lockedFriends = user.friends.filter(f => !f.isVoteEligible);
+    const premiumUser = isPremiumUser(user);
+    const [homeVibeBannerIndex, setHomeVibeBannerIndex] = useState(() => getHomeVibeBannerIndex(user.id));
+    const selectedHomeVibeBanner = VIBE_BANNERS[homeVibeBannerIndex] || VIBE_BANNERS[0];
+    const cycleHomeVibeBanner = () => {
+      const nextIndex = (homeVibeBannerIndex + 1) % VIBE_BANNERS.length;
+      saveHomeVibeBannerIndex(user.id, nextIndex);
+      setHomeVibeBannerIndex(nextIndex);
+    };
 
     return (
       <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col px-4 py-4 pb-28 lg:p-6 bg-background overflow-x-hidden">
@@ -1762,28 +1782,47 @@ export default function App() {
               <Button onClick={() => setCurrentScreen('storycard')} variant="secondary">View Story Card</Button>
             </div>
 
-            <div className="card-surface p-4 sm:p-6 min-w-0">
-              <div className="flex justify-between items-center mb-6">
+            <div className={`card-surface p-4 sm:p-6 min-w-0 overflow-hidden ${premiumUser ? 'relative' : ''}`}>
+              {premiumUser && (
+                <>
+                  <img src={selectedHomeVibeBanner.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-background/38" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-background/50 via-background/18 to-background/42" />
+                </>
+              )}
+              <div className="relative z-10 flex justify-between items-center mb-6">
                 <h3 className="font-bold font-display text-lg text-gradient">Top Traits</h3>
-                <span className="text-[10px] text-white/40 flex items-center gap-1.5 font-bold uppercase tracking-widest"><EyeOff size={14} /> Anonymous</span>
+                {!premiumUser && (
+                  <span className="text-[10px] text-white/40 flex items-center gap-1.5 font-bold uppercase tracking-widest"><EyeOff size={14} /> Anonymous</span>
+                )}
               </div>
               
-              <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              <div className="relative z-10 grid grid-cols-3 gap-3 sm:gap-4">
                 {topTraits.length > 0 ? topTraits.map((trait, i) => (
-                  <div key={trait.id} className="stat-item border-accent/20">
+                  <div key={trait.id} className={`${premiumUser ? 'bg-background/28 border border-white/25 backdrop-blur-[2px]' : 'stat-item border-accent/20'} rounded-lg p-3 text-center`}>
                     <span className="text-2xl block mb-2">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
                     <p className="text-xs font-extrabold uppercase mb-1 tracking-tight truncate w-full">{trait.name}</p>
-                    <p className="text-lg font-display font-black text-accent">{Math.round((trait.votes / effectiveTotalVotes) * 100 || 0)}%</p>
+                    <p className={`text-lg font-display font-black ${premiumUser ? 'text-white' : 'text-accent'}`}>{Math.round((trait.votes / effectiveTotalVotes) * 100 || 0)}%</p>
                   </div>
                 )) : (
                   [1,2,3].map(i => (
-                    <div key={i} className="stat-item border-white/5 opacity-50">
+                    <div key={i} className={`${premiumUser ? 'bg-background/25 border border-white/20 backdrop-blur-[2px]' : 'stat-item border-white/5'} rounded-lg p-3 text-center opacity-50`}>
                        <div className="w-8 h-8 rounded-full bg-white/5 mx-auto mb-2" />
                        <div className="w-12 h-2 bg-white/10 mx-auto rounded" />
                     </div>
                   ))
                 )}
               </div>
+              {premiumUser && (
+                <button
+                  type="button"
+                  onClick={cycleHomeVibeBanner}
+                  className="absolute right-3 bottom-3 z-20 w-9 h-9 rounded-full bg-background/65 border border-white/20 text-white/75 hover:text-white hover:border-accent/50 transition-colors flex items-center justify-center backdrop-blur-md"
+                  aria-label="Change Vibe banner"
+                >
+                  <Settings size={15} />
+                </button>
+              )}
             </div>
 
             <div className="card-surface p-4 sm:p-6 flex-1 min-h-0 flex flex-col min-w-0">
@@ -2144,6 +2183,11 @@ function FriendDetailsModal({ friend, onClose }: any) {
         exit={{ y: 16, scale: 0.98 }}
         className="relative z-10 w-full max-w-sm card-surface p-6 shadow-2xl"
       >
+        {premiumFriend && (
+          <div className="absolute right-4 top-4">
+            <Badge color="accent">Premium unlocked</Badge>
+          </div>
+        )}
         <div className="flex items-center gap-4 mb-6">
           {friend.avatar ? (
             <img src={friend.avatar} className="w-16 h-16 rounded-full border-2 border-accent object-cover" alt="" />
