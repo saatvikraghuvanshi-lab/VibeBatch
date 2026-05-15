@@ -3525,6 +3525,7 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
   const topTraits = getPositiveTraits(user.traits).slice(0, 3);
   const [description, setDescription] = useState(buildLocalPersonalityDescription(user.traits));
   const [previewBackground, setPreviewBackground] = useState(() => PREMIUM_STORY_BACKGROUNDS[Math.floor(Math.random() * PREMIUM_STORY_BACKGROUNDS.length)] || PREMIUM_STORY_BACKGROUNDS[0]);
+  const [hintsBackground] = useState(() => getNextPremiumBackground());
   const votedFriends = user.friends.filter(friend => friend.hasVoted);
   const hints = votedFriends.slice(0, 6).map((friend, index) => ({
     id: friend.id,
@@ -3614,13 +3615,16 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
         </div>
       </div>
 
-      <section className="card-surface p-5 mb-8">
-        <h3 className="text-sm font-black uppercase tracking-widest text-white/50 mb-4">Anonymous Trait Hints</h3>
-        <div className="space-y-3">
+      <section className="card-surface p-5 mb-8 relative overflow-hidden">
+        <img src={hintsBackground} alt="" className="absolute inset-0 w-full h-full object-cover" />
+        <div className="absolute inset-0 bg-background/55" />
+        <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-background/15 to-background/60" />
+        <h3 className="relative z-10 text-sm font-black uppercase tracking-widest text-white/70 mb-4">Anonymous Trait Hints</h3>
+        <div className="relative z-10 space-y-3">
           {hints.length > 0 ? hints.map((hint, index) => (
-            <div key={`${hint.id}-${index}`} className="flex items-center justify-between gap-4 bg-background/40 border border-accent/15 rounded-xl p-3">
+            <div key={`${hint.id}-${index}`} className="flex items-center justify-between gap-4 bg-background/70 border border-accent/25 rounded-xl p-3 shadow-lg shadow-black/15">
               <div className="min-w-0">
-                <p className="text-xs text-white/40 font-bold uppercase tracking-widest">Anonymous friend signal</p>
+                <p className="text-xs text-white/55 font-bold uppercase tracking-widest">Anonymous friend signal</p>
                 <p className="font-bold truncate">{hint.duration}</p>
                 {hint.sharedTrait && (
                   <p className="text-xs text-accent/80 font-bold mt-1">Shared top trait: {hint.sharedTrait}</p>
