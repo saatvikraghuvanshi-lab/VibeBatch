@@ -266,6 +266,29 @@ const getLocalCustomTraits = (userId?: string) => {
 const saveLocalCustomTraits = (userId: string, traits: string[]) => {
   window.localStorage.setItem(getCustomTraitsKey(userId), JSON.stringify(traits));
 };
+const getFriendSettingKey = (userId: string, friendId: string, setting: 'muted' | 'blocked') => (
+  `vibebatch_friend_${setting}_${userId}_${friendId}`
+);
+const getLocalFriendSetting = (userId?: string, friendId?: string, setting: 'muted' | 'blocked' = 'muted') => (
+  Boolean(userId && friendId && window.localStorage.getItem(getFriendSettingKey(userId, friendId, setting)))
+);
+const setLocalFriendSetting = (userId: string, friendId: string, setting: 'muted' | 'blocked', enabled: boolean) => {
+  const key = getFriendSettingKey(userId, friendId, setting);
+  if (enabled) window.localStorage.setItem(key, new Date().toISOString());
+  else window.localStorage.removeItem(key);
+};
+const parseIdList = (value: any): string[] => {
+  if (Array.isArray(value)) return value.filter(Boolean).map(String);
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean).map(String);
+    } catch {
+      return value.split(',').map(item => item.trim()).filter(Boolean);
+    }
+  }
+  return [];
+};
 const getProfileCustomTraits = (profile: any) => {
   const raw = profile?.custom_traits || profile?.customTraits || [];
   const profileTraits = Array.isArray(raw)
@@ -334,6 +357,20 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   const traits = mapSupabaseTraits(profile.traits || [], getProfileCustomTraits(profile));
   const totalVotes = profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
   const voteRecord = { traits, totalVotes };
+  const myId = link?.user_id;
+  const friendId = profile.id;
+  const blockedByMe = Boolean(
+    getLocalFriendSetting(myId, friendId, 'blocked') ||
+    parseIdList(link?.blocked_by).includes(myId)
+  );
+  const blockedMe = Boolean(
+    getLocalFriendSetting(friendId, myId, 'blocked') ||
+    parseIdList(reverseLink?.blocked_by).includes(friendId)
+  );
+  const isMuted = Boolean(
+    getLocalFriendSetting(myId, friendId, 'muted') ||
+    parseIdList(link?.muted_by).includes(myId)
+  );
 
   return ({
   id: profile.id,
@@ -350,6 +387,9 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   messagesCount: 0,
   status: 'offline',
   messages: [],
+  isMuted,
+  blockedByMe,
+  blockedMe,
   });
 };
 
@@ -548,6 +588,17 @@ export default function App() {
 
     if (reverseLinksError) throw reverseLinksError;
 
+    let moderationLinks: any[] = [];
+    try {
+      const { data } = await supabase
+        .from('friendships')
+        .select('user_id, friend_id, muted_by, blocked_by')
+        .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+      moderationLinks = data || [];
+    } catch (error) {
+      moderationLinks = [];
+    }
+
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*, traits(*)')
@@ -571,8 +622,14 @@ export default function App() {
         ...profile,
         traits: profile.traits?.length ? profile.traits : (explicitTraits.get(profile.id) || []),
       };
-      const link = links?.find((item: any) => item.friend_id === profile.id);
-      const reverseLink = reverseLinks?.find((item: any) => item.user_id === profile.id);
+      const link = {
+        ...(links?.find((item: any) => item.friend_id === profile.id) || {}),
+        ...(moderationLinks.find((item: any) => item.user_id === userId && item.friend_id === profile.id) || {}),
+      };
+      const reverseLink = {
+        ...(reverseLinks?.find((item: any) => item.user_id === profile.id) || {}),
+        ...(moderationLinks.find((item: any) => item.user_id === profile.id && item.friend_id === userId) || {}),
+      };
       const friend = mapProfileToFriend(profileWithTraits, link, reverseLink);
       const friendMessages = (messages || [])
         .filter((message: any) => (
@@ -590,7 +647,7 @@ export default function App() {
       return {
         ...friend,
         messages: friendMessages,
-        messagesCount: friendMessages.filter((message: ChatMessage) => !message.isRead && message.senderId !== 'me').length,
+        messagesCount: friend.isMuted ? 0 : friendMessages.filter((message: ChatMessage) => !message.isRead && message.senderId !== 'me').length,
       };
     });
   };
@@ -1092,8 +1149,64 @@ export default function App() {
     }
   };
 
+  const updateFriendModeration = async (friendId: string, setting: 'muted' | 'blocked', enabled: boolean) => {
+    if (!authState.user) return;
+
+    const column = setting === 'muted' ? 'muted_by' : 'blocked_by';
+    setLocalFriendSetting(authState.user.id, friendId, setting, enabled);
+
+    try {
+      const { data } = await supabase
+        .from('friendships')
+        .select(column)
+        .eq('user_id', authState.user.id)
+        .eq('friend_id', friendId)
+        .maybeSingle();
+      const ids = new Set(parseIdList(data?.[column]));
+      if (enabled) ids.add(authState.user.id);
+      else ids.delete(authState.user.id);
+
+      await supabase
+        .from('friendships')
+        .update({ [column]: [...ids] })
+        .eq('user_id', authState.user.id)
+        .eq('friend_id', friendId);
+    } catch (error) {
+      console.warn(`Friend ${setting} is using local fallback:`, error);
+    }
+
+    const friends = authState.user.friends.map(friend => (
+      friend.id === friendId
+        ? {
+            ...friend,
+            isMuted: setting === 'muted' ? enabled : friend.isMuted,
+            blockedByMe: setting === 'blocked' ? enabled : friend.blockedByMe,
+          }
+        : friend
+    ));
+
+    setAuthState(prev => ({
+      ...prev,
+      user: prev.user ? { ...prev.user, friends } : null,
+    }));
+    setSelectedFriend(prev => (
+      prev?.id === friendId
+        ? {
+            ...prev,
+            isMuted: setting === 'muted' ? enabled : prev.isMuted,
+            blockedByMe: setting === 'blocked' ? enabled : prev.blockedByMe,
+          }
+        : prev
+    ));
+  };
+
   const sendMessage = async (friendId: string, text: string) => {
     if (!authState.user) return;
+    const friend = authState.user.friends.find(item => item.id === friendId) || selectedFriend;
+    if (friend?.blockedByMe || friend?.blockedMe || getLocalFriendSetting(authState.user.id, friendId, 'blocked')) {
+      alert('Messages are blocked for this friend.');
+      return;
+    }
 
     const { data: authData, error: authError } = await supabase.auth.getUser();
     const senderId = authData.user?.id;
@@ -1898,6 +2011,7 @@ export default function App() {
               onBack={() => setCurrentScreen('friends')} 
               onSendMessage={(text: string) => sendMessage(selectedFriend.id, text)}
               onSendVoice={(blob: Blob, duration: number) => uploadVoiceMessage(selectedFriend.id, blob, duration)}
+              onUpdateModeration={(setting: 'muted' | 'blocked', enabled: boolean) => updateFriendModeration(selectedFriend.id, setting, enabled)}
             />
           )}
 
@@ -2653,9 +2767,10 @@ function StaticScreen({ title, onBack }: any) {
   )
 }
 
-function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
+function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice, onUpdateModeration }: any) {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -2682,6 +2797,10 @@ function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
   const send = async (e: any) => {
     e.preventDefault();
     if (!message.trim()) return;
+    if (friend.blockedByMe || friend.blockedMe) {
+      alert('Messages are blocked for this friend.');
+      return;
+    }
     const nextMessage = message;
     setMessage('');
     await onSendMessage(nextMessage);
@@ -2692,6 +2811,11 @@ function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
   };
 
   const toggleRecording = async () => {
+    if (friend.blockedByMe || friend.blockedMe) {
+      alert('Messages are blocked for this friend.');
+      return;
+    }
+
     if (isRecording) {
       stopRecording();
       return;
@@ -2742,15 +2866,21 @@ function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
 
   const handleAttachments = (files: FileList | null) => {
     if (!files?.length) return;
+    if (friend.blockedByMe || friend.blockedMe) {
+      alert('Messages are blocked for this friend.');
+      return;
+    }
     const fileNames = Array.from(files).map(file => file.name).join(', ');
     onSendMessage(`Attachment${files.length > 1 ? 's' : ''}: ${fileNames}`);
   };
+
+  const messagesBlocked = Boolean(friend.blockedByMe || friend.blockedMe);
 
   return (
     <div className="min-h-screen flex flex-col h-screen overflow-hidden bg-background">
       <div className="p-4 border-b border-white/5 flex items-center gap-4 bg-surface/50 backdrop-blur-md sticky top-0 z-10 shrink-0">
         <button onClick={onBack}><ChevronLeft /></button>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="relative">
             {friend.avatar ? (
               <img src={friend.avatar} className="w-10 h-10 rounded-full object-cover border-2 border-accent/20" alt="" />
@@ -2764,9 +2894,43 @@ function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
           <div>
             <p className="font-bold text-sm leading-none mb-1">{friend.displayName}</p>
             <p className={`text-[10px] font-bold uppercase tracking-widest leading-none ${friend.status === 'online' ? 'text-green-500' : 'text-white/20'}`}>
-              {friend.status === 'online' ? 'Online' : 'Offline'}
+              {messagesBlocked ? 'Blocked' : friend.isMuted ? 'Muted' : friend.status === 'online' ? 'Online' : 'Offline'}
             </p>
           </div>
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(open => !open)}
+            className="w-10 h-10 rounded-xl bg-background/40 border border-white/10 text-white/60 hover:text-accent hover:border-accent/40 flex items-center justify-center"
+            aria-label="Chat settings"
+          >
+            <Settings size={18} />
+          </button>
+          {settingsOpen && (
+            <div className="absolute right-0 top-12 w-48 rounded-xl bg-surface border border-accent/20 shadow-2xl shadow-black/30 p-2 z-20">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateModeration('muted', !friend.isMuted);
+                  setSettingsOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-white/75 hover:bg-accent/10"
+              >
+                {friend.isMuted ? 'Unmute messages' : 'Mute messages'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateModeration('blocked', !friend.blockedByMe);
+                  setSettingsOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm font-bold text-red-200 hover:bg-red-500/10"
+              >
+                {friend.blockedByMe ? 'Unblock friend' : 'Block friend'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -2811,6 +2975,12 @@ function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
         })}
       </div>
 
+      {messagesBlocked && (
+        <div className="px-4 py-3 border-t border-white/5 bg-red-500/10 text-red-100 text-xs font-bold text-center">
+          {friend.blockedByMe ? 'You blocked this friend. Unblock them from chat settings to message again.' : 'This friend has blocked messages.'}
+        </div>
+      )}
+
       <form onSubmit={send} className="p-4 border-t border-white/5 bg-surface/30 shrink-0">
         <input
           ref={attachmentInputRef}
@@ -2826,6 +2996,7 @@ function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
           <button
             type="button"
             onClick={() => attachmentInputRef.current?.click()}
+            disabled={messagesBlocked}
             className="bg-surface border border-white/10 text-white/60 p-3 rounded-xl hover:text-accent hover:border-accent/40 transition-colors"
             aria-label="Add photos, documents, or files"
           >
@@ -2835,12 +3006,14 @@ function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
             type="text" 
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder={isRecording ? "Recording voice..." : "Type a message..."} 
+            disabled={messagesBlocked}
+            placeholder={messagesBlocked ? "Messages are blocked" : isRecording ? "Recording voice..." : "Type a message..."} 
             className="flex-1 bg-surface border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-accent/50 transition-colors"
           />
           <button
             type="button"
             onClick={toggleRecording}
+            disabled={messagesBlocked}
             className={`border p-3 rounded-xl transition-colors ${
               isRecording
                 ? 'bg-red-500/15 border-red-400/40 text-red-300'
@@ -2852,7 +3025,7 @@ function ChatDetailScreen({ friend, onBack, onSendMessage, onSendVoice }: any) {
           </button>
           <button 
             type="submit"
-            disabled={!message.trim()}
+            disabled={!message.trim() || messagesBlocked}
             className="bg-accent text-background p-3 rounded-xl hover:scale-105 transition-all disabled:opacity-50 disabled:scale-100 shadow-lg shadow-accent/20"
           >
             <Send size={20} />
@@ -3079,7 +3252,8 @@ const buildLocalPersonalityDescription = (traits: Trait[] = []) => {
     return 'Your premium personality card will sharpen as friends add more trait votes.';
   }
 
-  return `Your presence blends ${names.join(', ')} into a profile that feels distinct and memorable. People seem to experience you as someone with a clear signature: expressive, intentional, and easy to recognize in a room.`;
+  const [first, second = 'memorable energy', third = 'intentional presence'] = names;
+  return `Your strongest signal is ${first}, giving your personality a clear first impression. Paired with ${second} and ${third}, your vibe feels specific, recognizable, and shaped by the traits people most associate with you.`;
 };
 
 const drawCoverImage = (ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, width: number, height: number) => {
@@ -3335,11 +3509,11 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
           }}
         >
           <div className="absolute inset-0 bg-[linear-gradient(120deg,transparent_0_24%,rgba(255,255,255,0.055)_31%,transparent_39%),repeating-linear-gradient(120deg,rgba(255,255,255,0.018)_0_1px,transparent_1px_16px)] pointer-events-none" />
-          <div className="absolute top-4 right-4 gradient-button !py-1 !px-3 text-[8px] font-black uppercase tracking-widest z-10">Premium</div>
+          <div className="gradient-button !py-1 !px-5 text-[8px] font-black uppercase tracking-widest z-10 mt-6">Premium</div>
           {user.avatar ? (
-            <img src={user.avatar} className="w-20 h-20 rounded-full object-cover border-4 border-accent mt-7 relative z-10" alt="" />
+            <img src={user.avatar} className="w-20 h-20 rounded-full object-cover border-4 border-accent mt-4 relative z-10" alt="" />
           ) : (
-            <div className="w-20 h-20 rounded-full bg-surface border border-accent/30 flex items-center justify-center mt-7 relative z-10">
+            <div className="w-20 h-20 rounded-full bg-surface border border-accent/30 flex items-center justify-center mt-4 relative z-10">
               <Crown size={24} />
             </div>
           )}
@@ -3347,8 +3521,8 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
             <p className="text-[clamp(1rem,4.8vw,1.35rem)] leading-tight font-black font-display truncate px-1">{user.username ? `@${user.username}` : user.displayName}</p>
             <div className="inline-block max-w-full gradient-button !py-1.5 !px-4 mt-2 text-[8px] font-black uppercase tracking-[0.12em] truncate">{user.identityTitle || 'Identity Locked'}</div>
           </div>
-          <p className="relative z-10 mt-5 text-[10px] font-black tracking-widest uppercase text-accent">Your Vibe</p>
-          <p className="relative z-10 text-[10px] sm:text-[11px] text-white/88 leading-relaxed text-center mt-2">{description}</p>
+          <p className="relative z-10 mt-6 text-[10px] font-black tracking-widest uppercase text-accent">Your Vibe</p>
+          <p className="relative z-10 text-[10px] sm:text-[11px] text-white/90 leading-relaxed text-center mt-2 px-1">{description}</p>
           <div className="relative z-10 w-full mt-3 space-y-2">
             {topTraits.map((trait, index) => (
               <div key={trait.id || trait.name} className="flex items-center gap-3 rounded-xl bg-surface/90 border border-accent/50 px-4 py-2.5">

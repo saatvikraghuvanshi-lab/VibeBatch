@@ -35,6 +35,9 @@ export interface Friend {
   messagesCount: number;
   status: 'online' | 'offline';
   messages: ChatMessage[];
+  isMuted?: boolean;
+  blockedByMe?: boolean;
+  blockedMe?: boolean;
 }
 
 export interface UserProfile {

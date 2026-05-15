@@ -8,6 +8,11 @@ import { Trait } from "./types";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
+function buildTraitBasedDescription(traitNames: string[]): string {
+  const [first = "Distinctive Presence", second = "Memorable Energy", third = "Intentional Style"] = traitNames;
+  return `You come across through ${first} first: someone whose presence is easy to notice and remember. With ${second} and ${third} shaping the rest of your vibe, people may read you as grounded, expressive, and quietly influential in the spaces you enter.`;
+}
+
 export async function generateIdentityTitle(traits: Trait[]): Promise<string> {
   const topTraits = [...traits]
     .sort((a, b) => b.votes - a.votes)
@@ -36,12 +41,12 @@ export async function generateIdentityTitle(traits: Trait[]): Promise<string> {
 }
 
 export async function generatePersonalityDescription(traits: Trait[]): Promise<string> {
-  const topTraits = [...traits]
+  const traitNames = [...traits]
     .sort((a, b) => b.votes - a.votes)
     .filter(t => t.votes > 0)
     .slice(0, 3)
-    .map(t => t.name)
-    .join(", ");
+    .map(t => t.name);
+  const topTraits = traitNames.join(", ");
 
   if (!topTraits) {
     return "Your VibeBatch profile is still forming as friends add their first impressions.";
@@ -55,9 +60,9 @@ export async function generatePersonalityDescription(traits: Trait[]): Promise<s
     const response = await result.response;
     const text = response.text().trim().replace(/^["']|["']$/g, '');
 
-    return text || "You come across as layered, memorable, and quietly distinctive, with a presence people notice and remember. Your strongest traits suggest someone who brings intention, warmth, and momentum into the spaces they enter.";
+    return text || buildTraitBasedDescription(traitNames);
   } catch (error) {
     console.error("AI description failed:", error);
-    return "You come across as layered, memorable, and quietly distinctive, with a presence people notice and remember. Your strongest traits suggest someone who brings intention, warmth, and momentum into the spaces they enter.";
+    return buildTraitBasedDescription(traitNames);
   }
 }
