@@ -3640,6 +3640,26 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
               </div>
             ))}
           </div>
+          <div className="mt-6 pt-6 border-t border-white/10">
+            <h4 className="text-xs font-black uppercase tracking-widest text-white/45 mb-4">Locked Preview</h4>
+            <div className="space-y-4">
+              {[
+                { label: 'Achievement Card', image: ACHIEVEMENT_BANNERS[2].image },
+                { label: 'Vibe Banner', image: VIBE_BANNERS[0].image },
+              ].map(item => (
+                <div key={item.label} className="relative overflow-hidden rounded-xl border border-accent/20 aspect-[3/1] bg-background">
+                  <img src={item.image} alt="" className="w-full h-full object-cover grayscale opacity-55" />
+                  <div className="absolute inset-0 bg-background/28 backdrop-blur-[1px]" />
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
+                    <span className="w-12 h-12 rounded-full bg-background/75 border border-white/20 flex items-center justify-center shadow-xl shadow-black/25">
+                      <Lock size={20} className="text-accent" />
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-white/80">{item.label} Locked</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
       </div>
     );
