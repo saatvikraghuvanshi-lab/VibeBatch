@@ -3645,7 +3645,8 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
             <div className="space-y-4">
               {[
                 { label: 'Achievement Card', image: ACHIEVEMENT_BANNERS[2].image },
-                { label: 'Vibe Banner', image: VIBE_BANNERS[0].image },
+                { label: 'Vibe Banner 1', image: VIBE_BANNERS[0].image },
+                { label: 'Vibe Banner 2', image: VIBE_BANNERS[1].image },
               ].map(item => (
                 <div key={item.label} className="relative overflow-hidden rounded-xl border border-accent/20 aspect-[3/1] bg-background">
                   <img src={item.image} alt="" className="w-full h-full object-cover grayscale opacity-55" />
