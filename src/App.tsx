@@ -38,6 +38,7 @@ import {
   Mic,
   Plus,
   Crown,
+  Flag,
 } from 'lucide-react';
 import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
 import { getStore, saveStore } from '../lib/store';
@@ -1661,7 +1662,7 @@ export default function App() {
               <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'traits'} onClick={() => setCurrentScreen('traits')} />
               <NavItem icon={<Hourglass size={20} />} active={currentScreen === 'hourglass'} onClick={() => setCurrentScreen('hourglass')} />
               <NavItem icon={<BarChart3 size={20} />} active={currentScreen === 'tracker'} onClick={() => setCurrentScreen('tracker')} />
-              <NavItem icon={<Sparkles size={20} />} active={currentScreen === 'banners'} onClick={() => setCurrentScreen('banners')} />
+              <NavItem icon={<Flag size={20} />} active={currentScreen === 'banners'} onClick={() => setCurrentScreen('banners')} />
               <NavItem icon={<Crown size={20} />} active={currentScreen === 'premium'} onClick={() => setCurrentScreen('premium')} />
             </div>
           </div>
@@ -1897,7 +1898,7 @@ export default function App() {
       { label: 'Traits', description: 'View your anonymous trait breakdown', icon: <Sparkles size={22} />, screen: 'traits' },
       { label: 'Eligibility', description: 'Check who can vote for your traits', icon: <Hourglass size={22} />, screen: 'hourglass' },
       { label: 'Vote Tracker', description: 'Track eligible, voted, and locked friends', icon: <BarChart3 size={22} />, screen: 'tracker' },
-      { label: 'Banners', description: 'Achievement milestones and premium Vibe banners', icon: <Sparkles size={22} />, screen: 'banners' },
+      { label: 'Banners', description: 'Achievement milestones and premium Vibe banners', icon: <Flag size={22} />, screen: 'banners' },
       { label: 'VibeBatch Premium', description: isPremiumUser(user) ? 'Premium insight cards and personality cards' : 'Plans, pricing, and premium features', icon: <Crown size={22} />, screen: 'premium' },
     ];
 
@@ -3208,7 +3209,7 @@ function ProfileSheet({ user, onClose, onLogout, onUpdateTitle, onUpdatePhoto, o
           <SheetOption icon={<Sparkles size={18} />} label="Manage custom traits" onClick={onManageCustomTraits} />
           <SheetOption icon={<Lock size={18} />} label="Reset password" onClick={() => onResetPassword()} />
           <SheetOption icon={<Download size={18} />} label="Download Story Card" onClick={() => onNavigate('storycard')} />
-          <SheetOption icon={<Sparkles size={18} />} label="Banners" onClick={() => onNavigate('banners')} />
+          <SheetOption icon={<Flag size={18} />} label="Banners" onClick={() => onNavigate('banners')} />
           <SheetOption 
             icon={<Sparkles className="text-accent" size={18} />} 
             label="Regenerate Identity Title" 
