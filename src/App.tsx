@@ -2169,6 +2169,7 @@ function FriendDetailsModal({ friend, onClose }: any) {
     .slice(0, 3);
   const premiumFriend = isPremiumUser(friend);
   const [traitsBackground] = useState(() => getNextPremiumBackground());
+  const [headerBanner] = useState(() => VIBE_BANNERS[Math.floor(Math.random() * VIBE_BANNERS.length)] || VIBE_BANNERS[0]);
 
   return (
     <motion.div
@@ -2184,20 +2185,22 @@ function FriendDetailsModal({ friend, onClose }: any) {
         exit={{ y: 16, scale: 0.98 }}
         className="relative z-10 w-full max-w-sm card-surface p-6 shadow-2xl"
       >
-        {premiumFriend && (
-          <div className="absolute right-4 top-4">
-            <Badge color="accent">Premium unlocked</Badge>
-          </div>
-        )}
-        <div className="flex items-center gap-4 mb-6">
+        <div className={`relative flex items-center gap-4 mb-6 ${premiumFriend ? 'rounded-xl overflow-hidden border border-accent/25 p-4 min-h-[120px]' : ''}`}>
+          {premiumFriend && (
+            <>
+              <img src={headerBanner.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-background/42" />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/55 via-background/12 to-background/52" />
+            </>
+          )}
           {friend.avatar ? (
-            <img src={friend.avatar} className="w-16 h-16 rounded-full border-2 border-accent object-cover" alt="" />
+            <img src={friend.avatar} className="relative z-10 w-16 h-16 rounded-full border-2 border-accent object-cover shrink-0" alt="" />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-background flex items-center justify-center text-white/20 font-black">
+            <div className="relative z-10 w-16 h-16 rounded-full bg-background flex items-center justify-center text-white/20 font-black shrink-0">
               {friend.displayName?.[0] || '?'}
             </div>
           )}
-          <div className="min-w-0">
+          <div className="relative z-10 min-w-0">
             <h3 className="text-xl font-bold font-display truncate">{friend.displayName}</h3>
             <p className="text-accent text-sm font-bold truncate">@{friend.username || friend.id}</p>
           </div>
