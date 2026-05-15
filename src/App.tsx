@@ -39,6 +39,7 @@ import {
   Plus,
   Crown,
   Flag,
+  RefreshCw,
 } from 'lucide-react';
 import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
 import { getStore, saveStore } from '../lib/store';
@@ -1799,14 +1800,14 @@ export default function App() {
               
               <div className="relative z-10 grid grid-cols-3 gap-3 sm:gap-4">
                 {topTraits.length > 0 ? topTraits.map((trait, i) => (
-                  <div key={trait.id} className={`${premiumUser ? 'bg-background/28 border border-white/25 backdrop-blur-[2px]' : 'stat-item border-accent/20'} rounded-lg p-3 text-center`}>
+                  <div key={trait.id} className={`${premiumUser ? 'bg-background/14 border border-white/25 backdrop-blur-[1px]' : 'stat-item border-accent/20'} rounded-lg p-3 text-center`}>
                     <span className="text-2xl block mb-2">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
                     <p className="text-xs font-extrabold uppercase mb-1 tracking-tight truncate w-full">{trait.name}</p>
                     <p className={`text-lg font-display font-black ${premiumUser ? 'text-white' : 'text-accent'}`}>{Math.round((trait.votes / effectiveTotalVotes) * 100 || 0)}%</p>
                   </div>
                 )) : (
                   [1,2,3].map(i => (
-                    <div key={i} className={`${premiumUser ? 'bg-background/25 border border-white/20 backdrop-blur-[2px]' : 'stat-item border-white/5'} rounded-lg p-3 text-center opacity-50`}>
+                    <div key={i} className={`${premiumUser ? 'bg-background/12 border border-white/20 backdrop-blur-[1px]' : 'stat-item border-white/5'} rounded-lg p-3 text-center opacity-50`}>
                        <div className="w-8 h-8 rounded-full bg-white/5 mx-auto mb-2" />
                        <div className="w-12 h-2 bg-white/10 mx-auto rounded" />
                     </div>
@@ -1820,7 +1821,7 @@ export default function App() {
                   className="absolute right-3 bottom-3 z-20 w-9 h-9 rounded-full bg-background/65 border border-white/20 text-white/75 hover:text-white hover:border-accent/50 transition-colors flex items-center justify-center backdrop-blur-md"
                   aria-label="Change Vibe banner"
                 >
-                  <Settings size={15} />
+                  <RefreshCw size={15} />
                 </button>
               )}
             </div>
