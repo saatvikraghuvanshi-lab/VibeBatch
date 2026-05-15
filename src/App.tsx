@@ -3626,11 +3626,13 @@ function PremiumScreen({ user, onBack }: { user: UserProfile; onBack: () => void
             {[
               'Anonymous hints about which friend signal connects to each trait.',
               'Shared top-trait clues when you and a friend have a top trait in common.',
-              'AI-made personality insight based on your voted traits.',
-              'Premium personality card with visual backgrounds and stacked top traits.',
-              'Achievement banners based on profile views.',
-              'Premium Vibe banners for profile visuals.',
-              'Downloadable premium card for sharing outside VibeBatch.',
+              'AI-made personality insight based on your top voted traits.',
+              'Premium personality card with shuffled visual backgrounds and stacked top traits.',
+              'Downloadable premium personality card for sharing outside VibeBatch.',
+              'Two unlockable Vibe banners for your home Top Traits card.',
+              'Premium friend profile header banners that shuffle when opened.',
+              'Achievement card gallery with Bronze through Immortal view milestones.',
+              'Premium-only visual styling across hints, cards, and profile previews.',
             ].map(feature => (
               <div key={feature} className="flex items-start gap-3 rounded-xl bg-background/40 border border-accent/15 p-3">
                 <Sparkles size={16} className="text-accent shrink-0 mt-0.5" />
