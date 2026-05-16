@@ -820,6 +820,7 @@ export default function App() {
     return mapProfileToUser({
       ...profile,
       email: authData.user?.email || profile.email,
+      created_at: profile.created_at || authData.user?.created_at,
       isPremium: profile.is_premium || isPremiumEmail(authData.user?.email) || isPremiumProfile(profile),
       traits: profile.traits?.length ? profile.traits : (explicitTraits.get(userId) || []),
     }, friends);
@@ -936,6 +937,7 @@ export default function App() {
           user: mapProfileToUser({
             ...profile,
             email: user.email,
+            created_at: profile.created_at || user.created_at,
             isPremium: profile.is_premium || isPremiumEmail(user.email) || isPremiumProfile(profile),
           }, friends),
           isAuthenticated: true
@@ -2896,9 +2898,9 @@ function StaticScreen({ title, user, onBack }: any) {
     return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   };
   const aboutRows = [
-    { label: 'Date of joining', value: formatProfileDate(user?.created_at || user?.createdAt || user?.joined_at || user?.joinedAt) },
-    { label: 'Account based in', value: user?.region || user?.accountRegion || 'Region not set' },
-    { label: 'Former username', value: user?.former_username || user?.formerUsername || 'No former username recorded' },
+    { label: 'Display Name', value: user?.displayName || user?.display_name || 'Not available' },
+    { label: 'Date of Joining', value: formatProfileDate(user?.created_at || user?.createdAt || user?.joined_at || user?.joinedAt) },
+    { label: 'Email', value: user?.email || 'Not available' },
   ];
   const privacySections = [
     ['Commitment to Privacy', 'We respect the privacy of every individual interacting with this VB profile. Any personal information voluntarily shared by users is handled with due care, responsibility, and professionalism. We believe transparency and trust are essential in all digital interactions and strive to maintain ethical practices in relation to user data and communications.'],
