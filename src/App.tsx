@@ -2704,10 +2704,12 @@ function SponsoredSignalsSection({ signals, compact = false }: { signals?: Spons
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-sponsored/80">Sponsored by</p>
-                <p className="font-black text-white truncate">{signal.companyName}</p>
-                <p className="mt-1 text-xs text-white/70">
-                  Trait: <span className="text-sponsored font-black">{signal.traitName}</span>
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-sponsored/80">Sponsored signal</p>
+                <p className="mt-1 text-xl sm:text-2xl font-black text-sponsored leading-tight truncate">
+                  {signal.traitName}
+                </p>
+                <p className="mt-1 text-xs sm:text-sm font-bold text-white/75 truncate">
+                  By {signal.companyName}
                 </p>
               </div>
             </div>
