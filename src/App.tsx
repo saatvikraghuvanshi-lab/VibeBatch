@@ -3149,6 +3149,8 @@ function VotingScreen({ friend, onBack, onVote }: any) {
 }
 
 function StaticScreen({ title, user, onBack }: any) {
+  const [supportMessage, setSupportMessage] = useState('');
+  const [supportSent, setSupportSent] = useState(false);
   const displayTitle = title === 'privacy' ? 'Privacy Profile' : title === 'terms' ? 'Terms of Use' : title;
   const formatProfileDate = (value?: string) => {
     if (!value) return 'Not available';
@@ -3201,6 +3203,25 @@ function StaticScreen({ title, user, onBack }: any) {
       ))}
     </div>
   );
+  const sendSupportMessage = () => {
+    const message = supportMessage.trim();
+    if (!message) return;
+
+    const subject = encodeURIComponent('VibeBatch Help Request');
+    const body = encodeURIComponent([
+      'Hi VibeBatch Support,',
+      '',
+      message,
+      '',
+      'Account details:',
+      `Display name: ${user?.displayName || 'Not available'}`,
+      `Username: ${user?.username || 'Not available'}`,
+      `Email: ${user?.email || 'Not available'}`,
+    ].join('\n'));
+
+    window.location.href = `mailto:vibebatchsocial@gmail.com?subject=${subject}&body=${body}`;
+    setSupportSent(true);
+  };
 
   const content = title === 'about' ? (
     <div className="space-y-6">
@@ -3224,6 +3245,51 @@ function StaticScreen({ title, user, onBack }: any) {
         <a href="mailto:vibebatchsocial@gmail.com" className="inline-flex rounded-xl border border-accent/25 bg-accent/10 px-4 py-3 text-sm font-black text-accent hover:bg-accent/15">
           vibebatchsocial@gmail.com
         </a>
+      </section>
+
+      <section className="max-w-3xl rounded-2xl border border-accent/20 bg-background/35 p-4 sm:p-5 shadow-lg shadow-accent/5">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
+            <MessageCircle size={20} />
+          </div>
+          <div>
+            <h3 className="text-white font-black text-lg">Chat with support</h3>
+            <p className="text-xs text-white/50 font-bold">Tell us what is bothering you. Our customer care team will help you over chat.</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-white/10 bg-white/8 px-4 py-3 text-sm text-white/75">
+            Hi, we are here to help. Describe the issue clearly and we will get back to you.
+          </div>
+
+          <textarea
+            value={supportMessage}
+            onChange={(event) => {
+              setSupportMessage(event.target.value);
+              setSupportSent(false);
+            }}
+            rows={5}
+            placeholder="Type what is bothering you..."
+            className="w-full resize-none rounded-2xl border border-accent/20 bg-background/55 px-4 py-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-accent/60 focus:ring-2 focus:ring-accent/15"
+          />
+
+          {supportSent && (
+            <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-md border border-accent/25 bg-accent/10 px-4 py-3 text-sm font-bold text-accent">
+              Your message is ready for our support team. Please send it from the email draft that opened.
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={sendSupportMessage}
+            disabled={!supportMessage.trim()}
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-300 via-accent to-primary px-5 py-3 text-sm font-black text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Send size={16} />
+            Send to support
+          </button>
+        </div>
       </section>
     </div>
   );
