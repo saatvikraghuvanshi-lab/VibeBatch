@@ -3206,6 +3206,44 @@ function StaticScreen({ title, user, onBack }: any) {
   );
   const getSupportAnswer = (message: string) => {
     const text = message.toLowerCase();
+    const includesAny = (words: string[]) => words.some(word => text.includes(word));
+
+    if (includesAny(['sign up', 'signup', 'create account', 'contact number', 'phone number'])) {
+      return 'To create an account, open the Sign up screen, enter your name, username, email, and password. Contact number is optional, so you can leave it empty.';
+    }
+    if (includesAny(['friend request', 'add friend', 'find friend', 'friends tab', 'friend tab'])) {
+      return 'To add or manage friends, go to the Friends tab from the bottom navigation. From there you can view friends, open profiles, start chats, and check voting eligibility.';
+    }
+    if (includesAny(['choose trait', 'select trait'])) {
+      return 'To vote for a friend, open the Friends tab, select an eligible friend, then choose one trait and submit. Each person can vote once, and votes are anonymous.';
+    }
+    if (includesAny(['story card', 'download card', 'free card', 'share card'])) {
+      return 'To download your free story card, go to Home and tap View Story Card, then use Download (Free). The free card shows your profile photo, username, identity title, stacked top traits, and VibeBatch branding.';
+    }
+    if (includesAny(['buy premium', 'vibebatch premium'])) {
+      return 'Open the VibeBatch Premium tab from the navigation. Premium includes anonymous hints, shared top-trait clues, the premium personality card, shuffled visual backgrounds, achievement banners, Vibe banners, and premium styling. The monthly pass is Rs. 199.';
+    }
+    if (includesAny(['download personality', 'premium card'])) {
+      return 'Premium users can open VibeBatch Premium, expand Card, preview the personality card, and download it. The card uses shuffled visual backgrounds and your top traits.';
+    }
+    if (includesAny(['anonymous hints', 'who voted', 'trait hint'])) {
+      return 'Premium users can open VibeBatch Premium and expand Hints to see anonymous friend signals, friendship-duration clues, and shared top-trait clues where available.';
+    }
+    if (includesAny(['vibe banner', 'achievement card', 'views'])) {
+      return 'Premium users can open VibeBatch Premium and expand Achievements or Vibes. Achievement cards are based on view milestones, while Vibe banners can be used for premium Top Traits styling.';
+    }
+    if (includesAny(['audio', 'voice message', 'send text'])) {
+      return 'To message a friend, open the Friends tab, choose a friend, and open their chat. You can send text and voice messages if neither user has blocked the other.';
+    }
+    if (includesAny(['unmute', 'unblock'])) {
+      return 'To unmute or unblock someone, open their chat and use the settings option in the top bar. Blocked users cannot message each other until unblocked.';
+    }
+    if (includesAny(['identity title', 'regenerate title'])) {
+      return 'Your identity title is based on your top voted traits. Use Regenerate identity title from your profile actions to refresh it after your traits update.';
+    }
+    if (includesAny(['about', 'privacy', 'terms', 'help page'])) {
+      return 'About, Help, Terms, and Privacy are available from the footer/navigation links. About shows profile basics, Help has support options, and Terms/Privacy explain platform rules and data practices.';
+    }
     if (/(password|reset|login|log in|sign in|credential|email)/.test(text)) {
       return 'For login or password issues, use Forgot password on the login screen, set a new password, then log in again with the same email. If it still says invalid credentials, double-check the exact email used during sign-up and contact support with that email.';
     }
@@ -3227,7 +3265,10 @@ function StaticScreen({ title, user, onBack }: any) {
     if (/(contact|support|help|customer care|team)/.test(text)) {
       return 'You can reach VibeBatch support at vibebatchsocial@gmail.com. Use Send to support here to open an email draft with your issue and account details.';
     }
-    return 'I do not have a sure answer for that yet. Use Send to support and our customer care team will review it directly.';
+    if (includesAny(['how do i', 'how to', 'where do i', 'where can i', 'where is', 'what is', 'why'])) {
+      return 'I can help with VibeBatch actions like logging in, signing up, adding friends, voting, viewing traits, adding custom traits, downloading story cards, using Premium, messaging, blocking, sponsored signals, and support. Try asking with one of those words, or use Send to support for a direct team reply.';
+    }
+    return 'I do not have a sure answer for that yet. Ask about login, friends, voting, traits, story cards, Premium, banners, messages, sponsored signals, or use Send to support for customer care.';
   };
   const answerSupportQuestion = () => {
     const message = supportMessage.trim();
