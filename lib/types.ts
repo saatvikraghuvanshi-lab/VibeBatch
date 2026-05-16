@@ -55,6 +55,7 @@ export interface UserProfile {
   displayName: string;
   username: string;
   email: string;
+  createdAt?: string;
   contactNumber: string;
   avatar: string;
   isPremium: boolean;

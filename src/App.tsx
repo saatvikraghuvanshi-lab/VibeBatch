@@ -484,6 +484,7 @@ const mapProfileToUser = (profile: any, friends: Friend[] = []): UserProfile => 
     displayName: profile.display_name || profile.displayName || profile.username || 'VibeBatch user',
     username: profile.username || '',
     email: profile.email || '',
+    createdAt: profile.created_at || profile.createdAt,
     contactNumber: profile.contact_number || profile.contactNumber || '',
     avatar: profile.avatar_url || profile.avatar || '',
     isPremium: isPremiumProfile(profile),
@@ -3152,16 +3153,31 @@ function StaticScreen({ title, user, onBack }: any) {
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSent, setSupportSent] = useState(false);
   const [supportReplies, setSupportReplies] = useState<string[]>([]);
+  const [liveAuthUser, setLiveAuthUser] = useState<any>(null);
   const displayTitle = title === 'privacy' ? 'Privacy Profile' : title === 'terms' ? 'Terms of Use' : title;
   const formatProfileDate = (value?: string) => {
     if (!value) return 'Not available';
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   };
+
+  useEffect(() => {
+    if (title !== 'about') return;
+
+    let active = true;
+    supabase.auth.getUser().then(({ data }) => {
+      if (active) setLiveAuthUser(data.user || null);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [title]);
+
   const aboutRows = [
     { label: 'Display Name', value: user?.displayName || user?.display_name || 'Not available' },
-    { label: 'Date of Joining', value: formatProfileDate(user?.created_at || user?.createdAt || user?.joined_at || user?.joinedAt) },
-    { label: 'Email', value: user?.email || 'Not available' },
+    { label: 'Date of Joining', value: formatProfileDate(user?.created_at || user?.createdAt || user?.joined_at || user?.joinedAt || liveAuthUser?.created_at) },
+    { label: 'Email', value: user?.email || liveAuthUser?.email || 'Not available' },
   ];
   const privacySections = [
     ['Commitment to Privacy', 'We respect the privacy of every individual interacting with this VB profile. Any personal information voluntarily shared by users is handled with due care, responsibility, and professionalism. We believe transparency and trust are essential in all digital interactions and strive to maintain ethical practices in relation to user data and communications.'],
