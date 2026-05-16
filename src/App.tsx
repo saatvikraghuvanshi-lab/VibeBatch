@@ -476,6 +476,8 @@ export default function App() {
   const [isLoginView, setIsLoginView] = useState(false);
   const [signupAvatarFile, setSignupAvatarFile] = useState<File | null>(null);
   const [signupAvatarPreview, setSignupAvatarPreview] = useState('');
+  const [isCustomTraitModalOpen, setIsCustomTraitModalOpen] = useState(false);
+  const [customTraitInput, setCustomTraitInput] = useState('');
 
   useEffect(() => {
     saveStore(authState);
@@ -1459,16 +1461,17 @@ export default function App() {
 
   const manageCustomTraits = async () => {
     if (!authState.user) return;
-    const customTraits = (authState.user.traits || [])
-      .filter(trait => trait.category === 'custom')
-      .map(trait => trait.name);
-    const traitName = window.prompt(
-      `Add a custom trait for your profile.${customTraits.length ? `\n\nCurrent custom traits:\n${customTraits.join('\n')}` : ''}\n\nDouble-check the spelling before saving. You will not be able to change it later.\n\nEnter a new trait name:`
-    );
+    setCustomTraitInput('');
+    setIsCustomTraitModalOpen(true);
+  };
 
-    const cleanName = traitName?.trim();
+  const saveCustomTrait = async () => {
+    if (!authState.user) return;
+    const cleanName = customTraitInput.trim();
     if (!cleanName) return;
 
+    setIsCustomTraitModalOpen(false);
+    setCustomTraitInput('');
     setLoading(true);
     try {
       const existingCustomTraits = getProfileCustomTraits(authState.user);
@@ -2153,6 +2156,22 @@ export default function App() {
       </AnimatePresence>
 
       <AnimatePresence>
+        {isCustomTraitModalOpen && authState.user && (
+          <CustomTraitModal
+            traits={authState.user.traits || []}
+            value={customTraitInput}
+            loading={loading}
+            onChange={setCustomTraitInput}
+            onClose={() => {
+              setIsCustomTraitModalOpen(false);
+              setCustomTraitInput('');
+            }}
+            onSubmit={saveCustomTrait}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {friendDetails && (
           <FriendDetailsModal friend={friendDetails} onClose={() => setFriendDetails(null)} />
         )}
@@ -2164,6 +2183,91 @@ export default function App() {
 
 
 // --- Screen Sub-components ---
+
+function CustomTraitModal({ traits, value, loading, onChange, onClose, onSubmit }: any) {
+  const customTraits = (traits || [])
+    .filter((trait: Trait) => trait.category === 'custom')
+    .map((trait: Trait) => trait.name);
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!value.trim() || loading) return;
+    onSubmit();
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+    >
+      <div className="absolute inset-0 bg-background/75 backdrop-blur-md" onClick={onClose} />
+      <motion.form
+        onSubmit={submit}
+        initial={{ y: 18, scale: 0.98 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 18, scale: 0.98 }}
+        className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-accent/30 bg-surface shadow-2xl shadow-purple-950/50"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(240,155,225,0.22),transparent_35%),linear-gradient(135deg,rgba(238,154,218,0.16),rgba(127,96,228,0.16),rgba(42,19,60,0.88))]" />
+        <div className="relative p-6 sm:p-7 space-y-5">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.22em] text-accent font-black mb-2">Manage custom traits</p>
+            <h3 className="text-2xl font-black font-display">Add a custom trait</h3>
+            <p className="text-sm text-white/65 mt-2">Add a custom trait for your profile.</p>
+          </div>
+
+          {customTraits.length > 0 && (
+            <div className="rounded-xl border border-white/10 bg-background/40 p-4">
+              <p className="text-[10px] uppercase tracking-widest text-white/40 font-black mb-3">Current custom traits</p>
+              <div className="flex flex-wrap gap-2">
+                {customTraits.map((trait: string) => (
+                  <span key={trait} className="rounded-full border border-accent/25 bg-accent/10 px-3 py-1 text-xs font-bold text-white/85">
+                    {trait}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <p className="rounded-xl border border-pink-200/20 bg-pink-300/10 p-4 text-sm font-black text-white leading-relaxed">
+            Double-check the spelling before saving. You will not be able to change it later.
+          </p>
+
+          <label className="block">
+            <span className="block text-[10px] uppercase tracking-widest text-white/45 font-black mb-2">New trait name</span>
+            <input
+              autoFocus
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              className="w-full rounded-xl border border-accent/35 bg-background/55 px-4 py-4 text-white outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent/20"
+              placeholder="Enter a new trait"
+              maxLength={40}
+            />
+          </label>
+
+          <div className="flex flex-col sm:flex-row gap-3 sm:justify-end pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-black uppercase tracking-wider text-white/75 hover:bg-white/10"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={!value.trim() || loading}
+              className="rounded-xl bg-gradient-to-r from-pink-300 via-lavender to-violet-500 px-6 py-3 text-sm font-black uppercase tracking-wider text-white shadow-lg shadow-accent/20 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? 'Saving...' : 'Save Trait'}
+            </button>
+          </div>
+        </div>
+      </motion.form>
+    </motion.div>
+  );
+}
 
 function FriendDetailsModal({ friend, onClose }: any) {
   const topTraits = [...(friend.traits || [])]
