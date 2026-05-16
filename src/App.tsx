@@ -40,8 +40,9 @@ import {
   Crown,
   Flag,
   RefreshCw,
+  ShieldCheck,
 } from 'lucide-react';
-import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage } from '../lib/types';
+import { UserProfile, AuthState, Trait, Friend, PREDEFINED_TRAITS, ChatMessage, SponsoredSignal } from '../lib/types';
 import { getStore, saveStore } from '../lib/store';
 import { generateIdentityTitle, generatePersonalityDescription } from '../lib/gemini';
 import vbLogo from './assets/vb-logo.png';
@@ -71,6 +72,7 @@ import achievementMythic from './assets/banners/achievement-mythic.jpg';
 import achievementImmortal from './assets/banners/achievement-immortal.jpg';
 import vibeBannerOne from './assets/banners/vibe-banner-1.jpg';
 import vibeBannerTwo from './assets/banners/vibe-banner-2.jpg';
+import resilienceOsLogo from './assets/resilience-os.jpeg';
 
 // --- Components ---
 
@@ -182,6 +184,10 @@ const VIBE_BANNERS = [
   { name: 'Vibe Banner I', image: vibeBannerOne },
   { name: 'Vibe Banner II', image: vibeBannerTwo },
 ];
+const KNOWN_SPONSOR_LOGOS: Record<string, string> = {
+  'resilience os': resilienceOsLogo,
+  resilienceos: resilienceOsLogo,
+};
 const getHomeVibeBannerKey = (userId?: string) => (
   userId ? `vibebatch_home_vibe_banner_${userId}` : ''
 );
@@ -278,6 +284,7 @@ const mergeStableUserState = (freshUser: UserProfile, previousUser?: UserProfile
     ...freshUser,
     friends: freshFriends,
     traits: mergedTraits,
+    sponsoredSignals: freshUser.sponsoredSignals || previousUser.sponsoredSignals || [],
     totalVotes: getTraitVoteTotal(freshUser.traits, freshUser.totalVotes) || previousUser.totalVotes,
   };
 };
@@ -390,6 +397,23 @@ const mapSupabaseTraits = (rows: any[] = [], customTraitNames: string[] = []) =>
   return mapped;
 };
 
+const mapSponsoredSignals = (rows: any[] = []): SponsoredSignal[] => (
+  rows
+    .filter(row => row && (row.trait_name || row.trait || row.name))
+    .map((row, index) => {
+      const companyName = row.company_name || row.company || row.sponsor_name || row.sponsored_by || 'Sponsored Partner';
+      const logo = row.company_logo_url || row.company_logo || row.logo_url || KNOWN_SPONSOR_LOGOS[normalizePremiumIdentifier(companyName)];
+      return {
+        id: String(row.id || `${companyName}-${row.trait_name || row.trait || row.name}-${index}`),
+        companyName,
+        companyLogo: logo,
+        traitName: row.trait_name || row.trait || row.name,
+        message: row.message || row.note || '',
+        createdAt: row.created_at || row.createdAt,
+      };
+    })
+);
+
 const askFriendshipLength = (friendName: string) => {
   const menu = FRIENDSHIP_LENGTH_OPTIONS
     .map((option, index) => `${index + 1}. ${option.label}`)
@@ -437,6 +461,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   isVoteEligible,
   traits,
   totalVotes,
+  sponsoredSignals: mapSponsoredSignals(profile.sponsored_signals || profile.sponsoredSignals || []),
   messagesCount: 0,
   status: 'offline',
   messages: [],
@@ -464,6 +489,7 @@ const mapProfileToUser = (profile: any, friends: Friend[] = []): UserProfile => 
     isPremium: isPremiumProfile(profile),
     traits,
     identityTitle: profile.identity_title || profile.identityTitle,
+    sponsoredSignals: mapSponsoredSignals(profile.sponsored_signals || profile.sponsoredSignals || []),
     friends,
     totalVotes,
   });
@@ -542,6 +568,31 @@ export default function App() {
           map.set(ownerId, [...(map.get(ownerId) || []), row]);
           return map;
         }, new Map<string, any[]>());
+      }
+    }
+
+    return new Map<string, any[]>();
+  };
+
+  const loadSponsoredSignalsForProfileIds = async (profileIds: string[]) => {
+    if (profileIds.length === 0) return new Map<string, any[]>();
+
+    const candidateColumns = ['target_user_id', 'user_id', 'profile_id'];
+    for (const column of candidateColumns) {
+      const { data, error } = await supabase
+        .from('sponsored_signals')
+        .select('*')
+        .in(column, profileIds);
+
+      if (!error && data) {
+        return data
+          .filter((row: any) => !row.status || ['active', 'approved'].includes(String(row.status).toLowerCase()))
+          .reduce((map: Map<string, any[]>, row: any) => {
+            const ownerId = row[column];
+            if (!ownerId) return map;
+            map.set(ownerId, [...(map.get(ownerId) || []), row]);
+            return map;
+          }, new Map<string, any[]>());
       }
     }
 
@@ -665,6 +716,7 @@ export default function App() {
 
     if (profilesError) throw profilesError;
     const explicitTraits = await loadTraitsForProfileIds(friendIds);
+    const explicitSponsoredSignals = await loadSponsoredSignalsForProfileIds(friendIds);
 
     const { data: messages, error: messagesError } = await supabase
       .from('messages')
@@ -680,6 +732,7 @@ export default function App() {
       const profileWithTraits = {
         ...profile,
         traits: profile.traits?.length ? profile.traits : (explicitTraits.get(profile.id) || []),
+        sponsored_signals: explicitSponsoredSignals.get(profile.id) || [],
       };
       const link = {
         ...(links?.find((item: any) => item.friend_id === profile.id) || {}),
@@ -791,6 +844,7 @@ export default function App() {
 
       if (error || !profile) return;
       const explicitTraits = await loadTraitsForProfileIds([friend.id]);
+      const explicitSponsoredSignals = await loadSponsoredSignalsForProfileIds([friend.id]);
       const traits = profile.traits?.length ? profile.traits : (explicitTraits.get(friend.id) || []);
 
       setFriendDetails({
@@ -802,6 +856,7 @@ export default function App() {
         is_premium: profile.is_premium || (friend as any).is_premium,
         isPremium: profile.isPremium || (friend as any).isPremium,
         traits: mapSupabaseTraits(traits, getProfileCustomTraits(profile)),
+        sponsoredSignals: mapSponsoredSignals(explicitSponsoredSignals.get(friend.id) || []),
       } as any);
     } catch (error) {
       console.warn('Could not refresh friend details:', error);
@@ -825,6 +880,7 @@ export default function App() {
     if (!profile) return null;
 
     const explicitTraits = await loadTraitsForProfileIds([userId]);
+    const explicitSponsoredSignals = await loadSponsoredSignalsForProfileIds([userId]);
     const friends = await refreshFriends(userId);
     const { data: authData } = await supabase.auth.getUser();
     return mapProfileToUser({
@@ -833,6 +889,7 @@ export default function App() {
       created_at: profile.created_at || authData.user?.created_at,
       isPremium: profile.is_premium || isPremiumEmail(authData.user?.email) || isPremiumProfile(profile),
       traits: profile.traits?.length ? profile.traits : (explicitTraits.get(userId) || []),
+      sponsored_signals: explicitSponsoredSignals.get(userId) || [],
     }, friends);
   };
 
@@ -865,6 +922,7 @@ export default function App() {
 
     if (data) {
       const explicitTraits = await loadTraitsForProfileIds([data.id]);
+      const explicitSponsoredSignals = await loadSponsoredSignalsForProfileIds([data.id]);
       const traits = data.traits?.length ? data.traits : (explicitTraits.get(data.id) || []);
       const mappedTraits = mapSupabaseTraits(traits || []);
       const totalVotes = data.total_votes || mappedTraits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
@@ -874,6 +932,7 @@ export default function App() {
         displayName: data.display_name, 
         avatar: data.avatar_url, 
         traits: mappedTraits,
+        sponsoredSignals: mapSponsoredSignals(explicitSponsoredSignals.get(data.id) || []),
         totalVotes,
         friends: [] 
       } as any);
@@ -1843,6 +1902,8 @@ export default function App() {
               )}
             </div>
 
+            <SponsoredSignalsSection signals={user.sponsoredSignals || []} compact />
+
             <div className="card-surface p-4 sm:p-6 flex-1 min-h-0 flex flex-col min-w-0">
                <h3 className="text-[10px] text-accent font-bold uppercase tracking-[0.2em] mb-6">Trait Breakdown</h3>
                <div className="space-y-5 overflow-y-auto pr-2 custom-scrollbar">
@@ -2334,6 +2395,8 @@ function FriendDetailsModal({ friend, onClose }: any) {
             </p>
           </div>
 
+          <SponsoredSignalsSection signals={friend.sponsoredSignals || []} compact />
+
           <div className={`relative overflow-hidden rounded-lg ${premiumFriend ? 'border border-accent/25 p-4' : ''}`}>
             {premiumFriend && (
               <>
@@ -2610,6 +2673,60 @@ function FriendsScreen({ onBack, user, onChat, onAddFriend, onOpenInvite, onUpda
   );
 }
 
+function SponsoredSignalsSection({ signals, compact = false }: { signals?: SponsoredSignal[]; compact?: boolean }) {
+  const visibleSignals = signals || [];
+  if (visibleSignals.length === 0) return null;
+
+  return (
+    <section className={`card-surface overflow-hidden ${compact ? 'p-4 sm:p-5' : 'p-5'}`}>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div>
+          <h3 className="text-sm font-black uppercase tracking-widest text-sponsored flex items-center gap-2">
+            <ShieldCheck size={16} />
+            Sponsored Signals
+          </h3>
+          <p className="text-[10px] text-white/40 mt-1 font-bold">
+            Partner-backed traits, shown separately from anonymous vote percentages.
+          </p>
+        </div>
+        <Badge color="amber">Partner</Badge>
+      </div>
+
+      <div className="grid gap-3">
+        {visibleSignals.map(signal => (
+          <div
+            key={signal.id}
+            className="relative overflow-hidden rounded-xl border border-sponsored/30 bg-[radial-gradient(circle_at_top_left,rgba(246,211,139,0.18),rgba(48,26,69,0.82)_55%,rgba(9,4,17,0.92))] p-4 shadow-lg shadow-sponsored/5"
+          >
+            <div className="absolute inset-y-0 right-0 w-28 bg-sponsored/10 blur-2xl" />
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="w-16 h-12 rounded-lg bg-background/70 border border-sponsored/20 overflow-hidden flex items-center justify-center shrink-0">
+                {signal.companyLogo ? (
+                  <img src={signal.companyLogo} className="w-full h-full object-cover" alt={`${signal.companyName} logo`} />
+                ) : (
+                  <ShieldCheck className="text-sponsored" size={24} />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.22em] text-sponsored/80">Sponsored by</p>
+                <p className="font-black text-white truncate">{signal.companyName}</p>
+                <p className="mt-1 text-xs text-white/70">
+                  Trait: <span className="text-sponsored font-black">{signal.traitName}</span>
+                </p>
+              </div>
+            </div>
+            {signal.message && (
+              <p className="relative z-10 mt-3 border-t border-sponsored/15 pt-3 text-xs text-white/55 leading-relaxed">
+                {signal.message}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function TraitsScreen({ onBack, user }: any) {
   const sortedTraits = [...user.traits].sort((a, b) => b.votes - a.votes);
   const votedTraits = getPositiveTraits(user.traits);
@@ -2658,6 +2775,7 @@ function TraitsScreen({ onBack, user }: any) {
       </div>
 
       <div className="space-y-6">
+        <SponsoredSignalsSection signals={user.sponsoredSignals || []} />
         <TraitCategory label="Voted Traits" traits={votedTraits} total={effectiveTotalVotes} />
         <TraitCategory label="Custom Traits" traits={customTraits} total={effectiveTotalVotes} custom />
         <TraitCategory label="Predefined Traits" traits={unvotedPredefinedTraits} total={effectiveTotalVotes} />

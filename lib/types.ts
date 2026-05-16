@@ -12,6 +12,15 @@ export interface Trait {
   sponsoredBy?: string;
 }
 
+export interface SponsoredSignal {
+  id: string;
+  companyName: string;
+  companyLogo?: string;
+  traitName: string;
+  message?: string;
+  createdAt?: string;
+}
+
 export interface ChatMessage {
   id: string;
   senderId: string;
@@ -38,6 +47,7 @@ export interface Friend {
   isMuted?: boolean;
   blockedByMe?: boolean;
   blockedMe?: boolean;
+  sponsoredSignals?: SponsoredSignal[];
 }
 
 export interface UserProfile {
@@ -50,6 +60,7 @@ export interface UserProfile {
   isPremium: boolean;
   traits: Trait[];
   identityTitle?: string;
+  sponsoredSignals?: SponsoredSignal[];
   friends: Friend[];
   totalVotes: number;
 }
