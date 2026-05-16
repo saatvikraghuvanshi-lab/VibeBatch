@@ -2394,6 +2394,8 @@ function FriendDetailsModal({ friend, onClose }: any) {
             </p>
           </div>
 
+          <SponsoredSignalsSection signals={friend.sponsoredSignals || []} compact />
+
           <div className={`relative overflow-hidden rounded-lg ${premiumFriend ? 'border border-accent/25 p-4' : ''}`}>
             {premiumFriend && (
               <>
