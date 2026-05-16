@@ -188,6 +188,14 @@ const KNOWN_SPONSOR_LOGOS: Record<string, string> = {
   'resilience os': resilienceOsLogo,
   resilienceos: resilienceOsLogo,
 };
+const KNOWN_SPONSORED_SIGNAL_IDENTIFIERS = new Set([
+  'saatvikraghuvanshi123',
+  'saatvikraghuvanshi123@gmail.com',
+  'saatv1k',
+  'shivankar',
+  'shivankarraghuwanshi2506@gmail.com',
+  'shivvv',
+]);
 const getHomeVibeBannerKey = (userId?: string) => (
   userId ? `vibebatch_home_vibe_banner_${userId}` : ''
 );
@@ -413,6 +421,34 @@ const mapSponsoredSignals = (rows: any[] = []): SponsoredSignal[] => (
       };
     })
 );
+const getKnownSponsoredSignalsForProfile = (profile: any): SponsoredSignal[] => {
+  const identifiers = [
+    profile?.username,
+    profile?.email,
+    profile?.display_name,
+    profile?.displayName,
+  ].map(normalizePremiumIdentifier).filter(Boolean);
+
+  if (!identifiers.some(identifier => KNOWN_SPONSORED_SIGNAL_IDENTIFIERS.has(identifier))) return [];
+
+  return [{
+    id: `resilience-os-${profile?.id || identifiers[0] || 'known-user'}`,
+    companyName: 'Resilience OS',
+    companyLogo: resilienceOsLogo,
+    traitName: 'Resilient Fighter',
+    message: 'Recognized by Resilience OS as a sponsored signal.',
+  }];
+};
+const mergeSponsoredSignals = (profile: any, rows: any[] = []) => {
+  const merged = [...mapSponsoredSignals(rows), ...getKnownSponsoredSignalsForProfile(profile)];
+  const seen = new Set<string>();
+  return merged.filter(signal => {
+    const key = `${normalizePremiumIdentifier(signal.companyName)}-${normalizeTraitName(signal.traitName)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
 
 const askFriendshipLength = (friendName: string) => {
   const menu = FRIENDSHIP_LENGTH_OPTIONS
@@ -461,7 +497,7 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   isVoteEligible,
   traits,
   totalVotes,
-  sponsoredSignals: mapSponsoredSignals(profile.sponsored_signals || profile.sponsoredSignals || []),
+  sponsoredSignals: mergeSponsoredSignals(profile, profile.sponsored_signals || profile.sponsoredSignals || []),
   messagesCount: 0,
   status: 'offline',
   messages: [],
@@ -490,7 +526,7 @@ const mapProfileToUser = (profile: any, friends: Friend[] = []): UserProfile => 
     isPremium: isPremiumProfile(profile),
     traits,
     identityTitle: profile.identity_title || profile.identityTitle,
-    sponsoredSignals: mapSponsoredSignals(profile.sponsored_signals || profile.sponsoredSignals || []),
+    sponsoredSignals: mergeSponsoredSignals(profile, profile.sponsored_signals || profile.sponsoredSignals || []),
     friends,
     totalVotes,
   });
@@ -857,7 +893,7 @@ export default function App() {
         is_premium: profile.is_premium || (friend as any).is_premium,
         isPremium: profile.isPremium || (friend as any).isPremium,
         traits: mapSupabaseTraits(traits, getProfileCustomTraits(profile)),
-        sponsoredSignals: mapSponsoredSignals(explicitSponsoredSignals.get(friend.id) || []),
+        sponsoredSignals: mergeSponsoredSignals(profile, explicitSponsoredSignals.get(friend.id) || []),
       } as any);
     } catch (error) {
       console.warn('Could not refresh friend details:', error);
@@ -933,7 +969,7 @@ export default function App() {
         displayName: data.display_name, 
         avatar: data.avatar_url, 
         traits: mappedTraits,
-        sponsoredSignals: mapSponsoredSignals(explicitSponsoredSignals.get(data.id) || []),
+        sponsoredSignals: mergeSponsoredSignals(data, explicitSponsoredSignals.get(data.id) || []),
         totalVotes,
         friends: [] 
       } as any);
@@ -2362,7 +2398,7 @@ function FriendDetailsModal({ friend, onClose }: any) {
         initial={{ y: 16, scale: 0.98 }}
         animate={{ y: 0, scale: 1 }}
         exit={{ y: 16, scale: 0.98 }}
-        className="relative z-10 w-full max-w-sm card-surface p-6 shadow-2xl"
+        className="relative z-10 w-full max-w-sm sm:max-w-md card-surface p-6 shadow-2xl"
       >
         <div className={`relative flex items-center gap-4 mb-6 ${premiumFriend ? 'rounded-xl overflow-hidden border border-accent/25 p-4 min-h-[120px]' : ''}`}>
           {premiumFriend && (
