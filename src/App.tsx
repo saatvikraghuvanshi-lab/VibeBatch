@@ -2720,9 +2720,6 @@ function SponsoredSignalsSection({ signals, compact = false }: { signals?: Spons
             <ShieldCheck size={16} />
             Sponsored Signals
           </h3>
-          <p className="text-[10px] text-white/40 mt-1 font-bold">
-            Partner-backed traits, shown separately from anonymous vote percentages.
-          </p>
         </div>
         <Badge color="amber">Partner</Badge>
       </div>
