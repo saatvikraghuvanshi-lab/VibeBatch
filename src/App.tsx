@@ -1461,7 +1461,7 @@ export default function App() {
       .filter(trait => trait.category === 'custom')
       .map(trait => trait.name);
     const traitName = window.prompt(
-      `Add a custom trait for your profile.${customTraits.length ? `\n\nCurrent custom traits:\n${customTraits.join('\n')}` : ''}\n\nEnter a new trait name:`
+      `Add a custom trait for your profile.${customTraits.length ? `\n\nCurrent custom traits:\n${customTraits.join('\n')}` : ''}\n\nDouble-check the spelling before saving. You will not be able to change it later.\n\nEnter a new trait name:`
     );
 
     const cleanName = traitName?.trim();
@@ -2125,6 +2125,7 @@ export default function App() {
           {['about', 'help', 'terms', 'privacy'].includes(currentScreen) && (
             <StaticScreen 
               title={currentScreen as any} 
+              user={authState.user}
               onBack={() => setCurrentScreen('home')} 
             />
           )}
@@ -2887,26 +2888,95 @@ function VotingScreen({ friend, onBack, onVote }: any) {
   );
 }
 
-function StaticScreen({ title, onBack }: any) {
+function StaticScreen({ title, user, onBack }: any) {
+  const displayTitle = title === 'privacy' ? 'Privacy Profile' : title === 'terms' ? 'Terms of Use' : title;
+  const formatProfileDate = (value?: string) => {
+    if (!value) return 'Not available';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  };
+  const aboutRows = [
+    { label: 'Date of joining', value: formatProfileDate(user?.created_at || user?.createdAt || user?.joined_at || user?.joinedAt) },
+    { label: 'Account based in', value: user?.region || user?.accountRegion || 'Region not set' },
+    { label: 'Former username', value: user?.former_username || user?.formerUsername || 'No former username recorded' },
+  ];
+  const privacySections = [
+    ['Commitment to Privacy', 'We respect the privacy of every individual interacting with this VB profile. Any personal information voluntarily shared by users is handled with due care, responsibility, and professionalism. We believe transparency and trust are essential in all digital interactions and strive to maintain ethical practices in relation to user data and communications.'],
+    ['Information We May Collect', 'During interaction with this VB profile, information may be collected directly or indirectly, including name or username, email address or phone number shared through messages or forms, information shared through messages or story cards, publicly available profile details visible on VB, and information voluntarily submitted for enquiries, collaborations, business communications, or customer support. We do not intentionally collect sensitive personal information unless required for a legitimate and lawful purpose.'],
+    ['Purpose of Information Usage', 'Information shared with us may be used for responding to enquiries or messages, providing customer assistance, communicating regarding services or collaborations, improving content quality and user engagement, understanding audience preferences, managing promotions or feedback, maintaining necessary communication records, and complying with applicable legal or regulatory requirements.'],
+    ['Confidentiality of Information', 'Information shared privately through direct communication is not sold, rented, traded, or intentionally disclosed to unauthorized third parties for commercial gain. Access to shared information is restricted to authorized individuals handling communications, operations, or administrative activities associated with this profile.'],
+    ['Third-Party Platforms and VB Policies', 'This profile operates through VibeBatch. Users interacting with this page are also subject to VibeBatch terms, privacy policies, data handling practices, and community guidelines. We do not control how VibeBatch or affiliated third-party services collect, process, store, or use data.'],
+    ['Data Security', 'Reasonable efforts are made to safeguard information against unauthorized access, misuse, disclosure, alteration, or destruction. No digital platform or internet-based communication system can guarantee complete security, so users should avoid sharing highly confidential, financial, sensitive, or personal information through direct messages or public comments.'],
+    ['External Links', 'This VB profile may contain links to external websites, forms, applications, or third-party platforms. We are not responsible for the privacy practices, content, or policies of such external websites or services. Users access external links at their own discretion.'],
+    ['User Responsibilities', 'Users are expected to share only accurate and lawful information, respect community standards and lawful communication practices, and ensure that any information shared belongs to them or is shared with proper authorization. Misuse, abusive conduct, unlawful activity, or violation of platform guidelines may result in restriction or reporting.'],
+    ['Retention of Information', 'Information shared through communications may be retained for reasonable operational, administrative, legal, or record-keeping purposes. We reserve the right to delete or remove information where considered appropriate, unnecessary, or legally required.'],
+    ['Changes to This Privacy Profile', 'This Privacy Profile may be updated, modified, or revised periodically without prior notice to reflect operational, legal, or policy changes. Continued interaction with this VB profile after updates constitutes acceptance of the revised terms.'],
+  ];
+  const termsSections = [
+    ['Acceptance of Terms', 'Use of this VB profile constitutes acceptance of these Terms of Use, along with applicable policies, terms, and community guidelines of VB. These terms apply to followers, users, collaborators, customers, and any individual interacting with this profile.'],
+    ['Purpose of the Profile', 'This VB profile is intended for informational, promotional, communication, branding, educational, networking, entertainment, or business-related purposes depending on the nature of the profile and its activities. Users are expected to interact responsibly, respectfully, and in compliance with applicable laws and platform guidelines.'],
+    ['User Conduct and Responsibilities', 'Users shall not engage in harassment, impersonation, spamming, trolling, disruptive conduct, malicious links, unauthorized promotion, intellectual property violations, privacy violations, illegal activity, unauthorized system access, identity misrepresentation, or collection and misuse of personal information without consent.'],
+    ['Intellectual Property Rights', 'Unless otherwise stated, all content on this VB profile, including text, graphics, logos, designs, images, captions, branding material, layouts, and visual elements, is owned, controlled, licensed, or lawfully used by the profile owner and protected under applicable intellectual property and copyright laws. Unauthorized reproduction, distribution, modification, republication, commercial exploitation, or use may result in legal consequences.'],
+    ['User-Generated Content', 'Users may interact through traits, messages, or other forms of engagement. By sharing content, users represent that they own or have the necessary rights to it, grant permission for such traits or interactions to be viewed, reposted, responded to, or used for engagement purposes unless specifically restricted, and agree that interactions remain respectful, lawful, and appropriate. We may remove, restrict, report, hide, or refuse content considered inappropriate, offensive, misleading, unlawful, spam-related, or inconsistent with the intended purpose of the profile.'],
+    ['Accuracy of Information', 'Reasonable efforts are made to ensure information shared on this profile is accurate and up to date. However, we do not guarantee completeness, reliability, suitability, or accuracy of any content, information, opinions, statements, or materials posted. Content may be modified, updated, corrected, or removed at any time without prior notice.'],
+    ['Third-Party Links and External Content', 'This VB profile may contain references, tags, mentions, links, or redirects to third-party websites, profiles, services, or platforms. We do not control, endorse, or assume responsibility for third-party content, external websites, products or services, privacy practices, or the accuracy or legality of external information.'],
+    ['Privacy and Data Usage', 'Information shared through messages, comments, enquiries, forms, or interactions is handled in accordance with the applicable Privacy Profile or privacy practices associated with this profile. Users should not disclose confidential, financial, sensitive, or personal information publicly or through unsecured communication channels.'],
+    ['No Professional or Legal Advice', 'Unless specifically stated otherwise, content shared on this VB profile is for general informational or engagement purposes only and should not be construed as professional, legal, financial, tax, medical, investment, or other regulated advice. Users should seek independent professional consultation where required.'],
+    ['Limitation of Liability', 'To the maximum extent permitted by law, the profile owner, administrators, affiliates, representatives, or associated persons shall not be liable for direct, indirect, incidental, consequential, or special damages, loss of data, reputation, opportunity, profits, business, reliance on profile information, unauthorized access, platform interruptions, technical issues, user-generated content, third-party conduct, errors, omissions, delays, or inaccuracies. Users interact voluntarily and at their own discretion and risk.'],
+    ['Right to Restrict Access', 'We reserve the right to restrict or terminate access, remove comments or content, block users, refuse engagement or communication, and report violations to relevant authorities or platform administrators where activity is abusive, unlawful, misleading, harmful, or inconsistent with these Terms of Use.'],
+    ['Indemnification', 'Users agree to indemnify and hold harmless the profile owner, administrators, affiliates, and representatives against claims, liabilities, damages, losses, expenses, or legal proceedings arising from violation of these Terms of Use, misuse of the profile, infringement of third-party rights, or unlawful conduct or communications by the user.'],
+    ['Modifications to Terms', 'These Terms of Use may be revised, updated, or modified from time to time without prior notice. Continued use or interaction after changes constitutes acceptance of the updated terms. Users are encouraged to review these terms periodically.'],
+    ['Governing Law and Jurisdiction', 'These Terms of Use shall be governed and interpreted in accordance with applicable laws and regulations of the relevant jurisdiction. Any disputes shall be subject to the jurisdiction of competent courts and authorities.'],
+    ['Contact Information', 'For questions, concerns, permissions, complaints, or communications relating to these Terms of Use, users may contact us through VB direct message or officially provided contact details associated with this profile.'],
+    ['Disclaimer', 'Use of this VB profile is voluntary and subject to platform rules, applicable laws, and these Terms of Use. Continued interaction constitutes acknowledgment and acceptance of the above terms and conditions.'],
+  ];
+
+  const renderSections = (sections: string[][]) => (
+    <div className="space-y-5">
+      {sections.map(([heading, body], index) => (
+        <section key={heading} className="space-y-2">
+          <h3 className="text-white font-black text-sm uppercase tracking-widest">{index + 1}. {heading}</h3>
+          <p className="text-sm opacity-80 leading-relaxed">{body}</p>
+        </section>
+      ))}
+    </div>
+  );
+
+  const content = title === 'about' ? (
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h3 className="text-white font-bold text-lg">About Your Profile</h3>
+        <div className="grid gap-3">
+          {aboutRows.map(row => (
+            <div key={row.label} className="rounded-xl border border-accent/15 bg-background/40 p-4">
+              <p className="text-[10px] uppercase tracking-widest text-white/35 font-black mb-1">{row.label}</p>
+              <p className="text-sm text-white/85 font-bold">{row.value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  ) : title === 'privacy' ? renderSections(privacySections) : title === 'terms' ? renderSections(termsSections) : (
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <h3 className="text-white font-bold text-lg">Help</h3>
+        <p className="text-sm opacity-80">Welcome to VibeBatch. This platform is designed to provide high-fidelity feedback on personality traits through an anonymous and time-gated social framework.</p>
+      </section>
+      <section className="space-y-3">
+        <h3 className="text-white font-bold text-lg">Core Philosophy</h3>
+        <p className="text-sm opacity-80">We believe identity is reflective. By pulse-checking how those closest to us perceive our traits, we can better understand our impact on the world around us.</p>
+      </section>
+    </div>
+  );
+
   return (
     <div className="min-h-screen p-6">
       <div className="flex items-center gap-4 mb-8">
         <button onClick={onBack}><ChevronLeft /></button>
-        <h2 className="text-2xl font-bold font-display capitalize">{title}</h2>
+        <h2 className="text-2xl font-bold font-display capitalize">{displayTitle}</h2>
       </div>
       <Card className="min-h-[60vh] p-6 text-white/80 leading-relaxed space-y-6 overflow-y-auto">
-        <section className="space-y-3">
-          <h3 className="text-white font-bold text-lg">Introduction</h3>
-          <p className="text-sm opacity-80">Welcome to VibeBatch. This platform is designed to provide high-fidelity feedback on personality traits through an anonymous and time-gated social framework. Our goal is to provide a "vibe check" that actually means something.</p>
-        </section>
-        <section className="space-y-3">
-          <h3 className="text-white font-bold text-lg">Core Philosophy</h3>
-          <p className="text-sm opacity-80">We believe identity is reflective. By pulse-checking how those closest to us perceive our traits, we can better understand our impact on the world around us. We strictly enforce anonymity to ensure honesty and safety for all participants.</p>
-        </section>
-        <section className="space-y-3">
-          <h1 className="text-accent font-bold">Standard Placeholder Content</h1>
-          <p className="text-sm opacity-60">This section would typically contain the full legal text for the {title} page. This includes your rights, our responsibilities, and the mechanisms of data processing that power the VibeBatch AI identity engine.</p>
-        </section>
+        {content}
         <div className="pt-12 text-center opacity-20 italic">
           <p>Last updated: May 2026</p>
         </div>
