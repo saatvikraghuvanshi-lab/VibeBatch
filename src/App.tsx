@@ -3151,6 +3151,7 @@ function VotingScreen({ friend, onBack, onVote }: any) {
 function StaticScreen({ title, user, onBack }: any) {
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSent, setSupportSent] = useState(false);
+  const [supportReplies, setSupportReplies] = useState<string[]>([]);
   const displayTitle = title === 'privacy' ? 'Privacy Profile' : title === 'terms' ? 'Terms of Use' : title;
   const formatProfileDate = (value?: string) => {
     if (!value) return 'Not available';
@@ -3203,6 +3204,38 @@ function StaticScreen({ title, user, onBack }: any) {
       ))}
     </div>
   );
+  const getSupportAnswer = (message: string) => {
+    const text = message.toLowerCase();
+    if (/(password|reset|login|log in|sign in|credential|email)/.test(text)) {
+      return 'For login or password issues, use Forgot password on the login screen, set a new password, then log in again with the same email. If it still says invalid credentials, double-check the exact email used during sign-up and contact support with that email.';
+    }
+    if (/(vote|voting|voted|percentage|trait breakdown|top trait)/.test(text)) {
+      return 'Votes are anonymous and only count after the trait write succeeds. Trait percentages come from saved trait votes, while sponsored signals are shown separately and do not affect percentages.';
+    }
+    if (/(premium|subscription|199|pass|personality card|anonymous hint|banner|achievement)/.test(text)) {
+      return 'VibeBatch Premium includes anonymous trait hints, shared top-trait clues, the premium personality card, shuffled visual backgrounds, achievement banners, Vibe banners, and premium styling. The current monthly pass is ₹199.';
+    }
+    if (/(custom trait|custom traits|trait spelling|add trait)/.test(text)) {
+      return 'Custom traits can be added from Manage custom traits. Please double-check spelling before saving because custom trait names cannot be changed later.';
+    }
+    if (/(message|chat|mute|block|friend)/.test(text)) {
+      return 'For friend chats, open a friend conversation and use the settings icon for mute or block options. If either person blocks the other, messaging between both users is stopped.';
+    }
+    if (/(sponsor|sponsored|company|resilience)/.test(text)) {
+      return 'Sponsored Signals are separate partner-backed traits. They show the company name and trait clearly, but they do not affect normal trait percentages.';
+    }
+    if (/(contact|support|help|customer care|team)/.test(text)) {
+      return 'You can reach VibeBatch support at vibebatchsocial@gmail.com. Use Send to support here to open an email draft with your issue and account details.';
+    }
+    return 'I do not have a sure answer for that yet. Use Send to support and our customer care team will review it directly.';
+  };
+  const answerSupportQuestion = () => {
+    const message = supportMessage.trim();
+    if (!message) return;
+    setSupportReplies(previous => [...previous, getSupportAnswer(message)]);
+    setSupportMessage('');
+    setSupportSent(false);
+  };
   const sendSupportMessage = () => {
     const message = supportMessage.trim();
     if (!message) return;
@@ -3280,15 +3313,32 @@ function StaticScreen({ title, user, onBack }: any) {
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={sendSupportMessage}
-            disabled={!supportMessage.trim()}
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-300 via-accent to-primary px-5 py-3 text-sm font-black text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Send size={16} />
-            Send to support
-          </button>
+          {supportReplies.map((reply, index) => (
+            <div key={`${reply}-${index}`} className="max-w-[88%] rounded-2xl rounded-bl-md border border-white/10 bg-white/8 px-4 py-3 text-sm text-white/75">
+              {reply}
+            </div>
+          ))}
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              type="button"
+              onClick={answerSupportQuestion}
+              disabled={!supportMessage.trim()}
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-accent/30 bg-accent/10 px-5 py-3 text-sm font-black text-accent transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <MessageCircle size={16} />
+              Ask VibeBatch Help
+            </button>
+            <button
+              type="button"
+              onClick={sendSupportMessage}
+              disabled={!supportMessage.trim()}
+              className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-pink-300 via-accent to-primary px-5 py-3 text-sm font-black text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Send size={16} />
+              Send to support
+            </button>
+          </div>
         </div>
       </section>
     </div>
