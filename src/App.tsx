@@ -403,7 +403,11 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
   const relationshipLength = link?.relationship_length || '';
   const friendRelationshipLength = reverseLink?.relationship_length || '';
   const isVoteEligible = isEligibleLength(relationshipLength) && isEligibleLength(friendRelationshipLength);
-  const traits = mapSupabaseTraits(profile.traits || [], getProfileCustomTraits(profile));
+  const traits = mapSupabaseTraits(profile.traits || [], getProfileCustomTraits(profile)).map((trait: Trait) => (
+    trait.category === 'custom'
+      ? { ...trait, addedBy: profile.username ? `@${profile.username}` : (profile.display_name || 'this user'), addedById: profile.id }
+      : trait
+  ));
   const totalVotes = profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
   const voteRecord = { traits, totalVotes };
   const myId = link?.user_id;
@@ -443,7 +447,11 @@ const mapProfileToFriend = (profile: any, link?: any, reverseLink?: any): Friend
 };
 
 const mapProfileToUser = (profile: any, friends: Friend[] = []): UserProfile => {
-  const traits = mapSupabaseTraits(profile.traits || [], getProfileCustomTraits(profile));
+  const traits = mapSupabaseTraits(profile.traits || [], getProfileCustomTraits(profile)).map((trait: Trait) => (
+    trait.category === 'custom'
+      ? { ...trait, addedBy: 'you', addedById: profile.id }
+      : trait
+  ));
   const totalVotes = profile.total_votes || traits.reduce((sum, trait) => sum + (trait.votes || 0), 0);
 
   return ({
@@ -1492,7 +1500,11 @@ export default function App() {
       }
 
       const freshUser = await loadCurrentUserProfile(authState.user.id);
-      const fallbackTraits = mapSupabaseTraits(freshUser?.traits || authState.user.traits, nextCustomTraits);
+      const fallbackTraits = mapSupabaseTraits(freshUser?.traits || authState.user.traits, nextCustomTraits).map((trait: Trait) => (
+        trait.category === 'custom'
+          ? { ...trait, addedBy: 'you', addedById: authState.user?.id }
+          : trait
+      ));
       setAuthState(prev => ({
         ...prev,
         user: prev.user
@@ -2334,7 +2346,14 @@ function FriendDetailsModal({ friend, onClose }: any) {
             {topTraits.length > 0 ? (
               <div className="relative z-10 flex flex-wrap gap-2">
                 {topTraits.map((trait: Trait) => (
-                  <Badge key={trait.id || trait.name} color="pink">{trait.name}</Badge>
+                  <div key={trait.id || trait.name} className="flex flex-col gap-1">
+                    <Badge color="pink">{trait.name}</Badge>
+                    {trait.category === 'custom' && (
+                      <span className="text-[7px] uppercase tracking-widest text-white/45 font-black">
+                        Added by {(trait as any).addedBy || 'this user'}
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
@@ -2618,6 +2637,11 @@ function TraitsScreen({ onBack, user }: any) {
              <span className={`text-2xl font-bold font-display mb-1 ${trait.category === 'sponsored' ? 'text-sponsored' : i === 0 ? 'text-accent' : i === 1 ? 'text-white/60' : 'text-white/40'}`}>#{i + 1}</span>
              <span className="text-xs font-bold block mb-1">{trait.name}</span>
              <Badge color={trait.category === 'sponsored' ? 'amber' : i === 0 ? 'accent' : 'pink'}>{Math.round((trait.votes / effectiveTotalVotes) * 100)}%</Badge>
+             {trait.category === 'custom' && (
+               <p className="text-[7px] text-accent/70 font-black uppercase mt-3 tracking-widest border-t border-accent/20 pt-2 w-full">
+                 Added by {(trait as any).addedBy || 'you'}
+               </p>
+             )}
              {trait.category === 'sponsored' && (
                <p className="text-[7px] text-sponsored font-black uppercase mt-3 tracking-widest border-t border-sponsored/20 pt-2 w-full">Sponsored by {trait.sponsoredBy}</p>
              )}
@@ -2903,11 +2927,20 @@ function VotingScreen({ friend, onBack, onVote }: any) {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const customTraitNames = (friend.traits || [])
+  const customTraitOptions = (friend.traits || [])
     .filter((trait: Trait) => trait.category === 'custom')
-    .map((trait: Trait) => trait.name)
-    .filter(Boolean);
-  const traits = [...new Set([...PREDEFINED_TRAITS.map(t => t.name!), ...customTraitNames])];
+    .map((trait: Trait) => ({
+      name: trait.name,
+      isCustom: true,
+      addedBy: (trait as any).addedBy || (friend.username ? `@${friend.username}` : friend.displayName),
+    }))
+    .filter((trait: any) => trait.name);
+  const traitOptions = [
+    ...PREDEFINED_TRAITS.map(t => ({ name: t.name!, isCustom: false, addedBy: '' })),
+    ...customTraitOptions,
+  ].filter((trait, index, array) => (
+    trait.name && array.findIndex(item => normalizeTraitName(item.name) === normalizeTraitName(trait.name)) === index
+  ));
 
   const toggleTrait = (name: string) => {
     setSelectedTrait(prev => prev === name ? '' : name);
@@ -2953,13 +2986,18 @@ function VotingScreen({ friend, onBack, onVote }: any) {
 
       <div className="flex-1 overflow-y-auto mb-8 pr-1 custom-scrollbar">
         <div className="grid grid-cols-2 gap-3">
-          {traits.map(trait => (
+          {traitOptions.map(trait => (
             <button 
-              key={trait}
-              onClick={() => toggleTrait(trait)}
-              className={`p-4 card-surface font-bold text-sm transition-all text-center ${selectedTrait === trait ? 'bg-accent/20 border-accent text-accent glowing-accent' : 'hover:border-white/20'}`}
+              key={trait.name}
+              onClick={() => toggleTrait(trait.name)}
+              className={`p-4 card-surface font-bold text-sm transition-all text-center ${selectedTrait === trait.name ? 'bg-accent/20 border-accent text-accent glowing-accent' : 'hover:border-white/20'} ${trait.isCustom ? 'border-accent/30 bg-accent/5' : ''}`}
             >
-              {trait}
+              <span className="block">{trait.name}</span>
+              {trait.isCustom && (
+                <span className="mt-2 block text-[8px] uppercase tracking-widest text-white/45">
+                  Added by {trait.addedBy}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -3066,11 +3104,10 @@ function StaticScreen({ title, user, onBack }: any) {
     <div className="space-y-6">
       <section className="space-y-3">
         <h3 className="text-white font-bold text-lg">Help</h3>
-        <p className="text-sm opacity-80">Welcome to VibeBatch. This platform is designed to provide high-fidelity feedback on personality traits through an anonymous and time-gated social framework.</p>
-      </section>
-      <section className="space-y-3">
-        <h3 className="text-white font-bold text-lg">Core Philosophy</h3>
-        <p className="text-sm opacity-80">We believe identity is reflective. By pulse-checking how those closest to us perceive our traits, we can better understand our impact on the world around us.</p>
+        <p className="text-sm opacity-80">For support, questions, or account help, contact us at:</p>
+        <a href="mailto:vibebatchsocial@gmail.com" className="inline-flex rounded-xl border border-accent/25 bg-accent/10 px-4 py-3 text-sm font-black text-accent hover:bg-accent/15">
+          vibebatchsocial@gmail.com
+        </a>
       </section>
     </div>
   );
@@ -3486,6 +3523,15 @@ const TraitRow = ({ trait, total }: any) => {
              BY {trait.sponsoredBy?.toUpperCase()}
            </span>
            <span className="text-[6px] text-sponsored/40 font-black tracking-tighter">OFFICIAL PARTNER</span>
+        </div>
+      )}
+      {isCustom && (
+        <div className="flex justify-between items-center pt-2 mt-1 border-t border-accent/10">
+           <span className="text-[7px] font-black text-accent/70 uppercase tracking-widest flex items-center gap-1">
+             <div className="w-1 h-1 rounded-full bg-accent" />
+             Added by {(trait as any).addedBy || 'you'}
+           </span>
+           <span className="text-[6px] text-white/35 font-black tracking-tighter uppercase">Owner trait</span>
         </div>
       )}
     </div>
