@@ -1902,8 +1902,6 @@ export default function App() {
               )}
             </div>
 
-            <SponsoredSignalsSection signals={user.sponsoredSignals || []} compact />
-
             <div className="card-surface p-4 sm:p-6 flex-1 min-h-0 flex flex-col min-w-0">
                <h3 className="text-[10px] text-accent font-bold uppercase tracking-[0.2em] mb-6">Trait Breakdown</h3>
                <div className="space-y-5 overflow-y-auto pr-2 custom-scrollbar">
@@ -2394,8 +2392,6 @@ function FriendDetailsModal({ friend, onClose }: any) {
               {friend.isVoteEligible ? 'Voting unlocked by both users.' : 'Voting unlocks when both users confirm 6 months or more.'}
             </p>
           </div>
-
-          <SponsoredSignalsSection signals={friend.sponsoredSignals || []} compact />
 
           <div className={`relative overflow-hidden rounded-lg ${premiumFriend ? 'border border-accent/25 p-4' : ''}`}>
             {premiumFriend && (
