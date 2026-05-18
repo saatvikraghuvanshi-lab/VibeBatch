@@ -11,7 +11,7 @@ Live site:
 
 VibeBatch turns friend feedback into a visual personality profile. Users can sign up, add friends, vote for one trait per friend, view trait percentages, create story cards, message friends, and access premium profile insights.
 
-The website is built as a React/Vite frontend with Supabase handling authentication, profile data, friend relationships, messages, traits, and sponsored signals.
+The web application is built as a React/Vite frontend with Supabase handling authentication, profile data, friend relationships, messages, traits, and sponsored signals.
 
 ## Features
 
