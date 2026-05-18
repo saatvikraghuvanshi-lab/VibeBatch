@@ -1,6 +1,6 @@
 # VibeBatch
 
-VibeBatch is a social personality app where friends anonymously vote on each other's traits, build a public-facing vibe profile, and unlock premium visual identity cards.
+VibeBatch is a social personality web application where friends anonymously vote on each other's traits, build a public-facing vibe profile, and unlock premium visual identity cards.
 
 Live site:
 
@@ -11,7 +11,7 @@ Live site:
 
 VibeBatch turns friend feedback into a visual personality profile. Users can sign up, add friends, vote for one trait per friend, view trait percentages, create story cards, message friends, and access premium profile insights.
 
-The app is built as a React/Vite frontend with Supabase handling authentication, profile data, friend relationships, messages, traits, and sponsored signals.
+The website is built as a React/Vite frontend with Supabase handling authentication, profile data, friend relationships, messages, traits, and sponsored signals.
 
 ## Features
 
@@ -34,7 +34,7 @@ The app is built as a React/Vite frontend with Supabase handling authentication,
   - Vibe banner styling
   - Premium friend profile presentation
 - Sponsored Signals section for company-backed traits
-- Static About, Help, Terms, and Privacy pages
+- Static About, Help, Terms, Privacy and Copyright pages
 - Help chatbox with built-in VibeBatch support answers and email escalation
 
 ## Tech Stack
