@@ -2008,6 +2008,7 @@ export default function App() {
             <button onClick={() => setCurrentScreen('help')} className="text-[11px] text-white/40 hover:text-white font-bold uppercase tracking-wider">Help</button>
             <button onClick={() => setCurrentScreen('terms')} className="text-[11px] text-white/40 hover:text-white font-bold uppercase tracking-wider">Terms</button>
             <button onClick={() => setCurrentScreen('privacy')} className="text-[11px] text-white/40 hover:text-white font-bold uppercase tracking-wider">Privacy</button>
+            <button onClick={() => setCurrentScreen('copyright')} className="text-[11px] text-white/40 hover:text-white font-bold uppercase tracking-wider">Copyright</button>
           </div>
           <p className="text-[11px] text-white/20 font-bold tracking-wider uppercase">© 2026 VibeBatch. All votes are anonymous.</p>
         </footer>
@@ -2031,6 +2032,7 @@ export default function App() {
         <button onClick={() => setCurrentScreen('help')}>Help</button>
         <button onClick={() => setCurrentScreen('terms')}>Terms</button>
         <button onClick={() => setCurrentScreen('privacy')}>Privacy</button>
+        <button onClick={() => setCurrentScreen('copyright')}>Copyright</button>
       </div>
       <p className="text-[10px] text-white/10 font-bold tracking-widest">© 2026 VIBEBATCH</p>
     </footer>
@@ -2235,7 +2237,7 @@ export default function App() {
             />
           )}
 
-          {['about', 'help', 'terms', 'privacy'].includes(currentScreen) && (
+          {['about', 'help', 'terms', 'privacy', 'copyright'].includes(currentScreen) && (
             <StaticScreen 
               title={currentScreen as any} 
               user={authState.user}
@@ -3244,6 +3246,30 @@ function StaticScreen({ title, user, onBack }: any) {
     ['Contact Information', 'For questions, concerns, permissions, complaints, or communications relating to these Terms of Use, users may contact us through VB direct message or officially provided contact details associated with this profile.'],
     ['Disclaimer', 'Use of this VB profile is voluntary and subject to platform rules, applicable laws, and these Terms of Use. Continued interaction constitutes acknowledgment and acceptance of the above terms and conditions.'],
   ];
+  const restrictedCopyrightUses = [
+    'Copy, clone, imitate, or reproduce this website or any part of it',
+    'Reuse, modify, distribute, or resell the source code',
+    'Duplicate the design, layout, or unique functionalities',
+    'Create derivative platforms based on this website',
+    'Use any branding, assets, or concepts without prior written permission',
+  ];
+  const protectedCopyrightItems = [
+    'Website design and visual identity',
+    'Custom functionalities and unique features',
+    'Source code, backend systems, and database structure',
+    'User interface (UI) and user experience (UX)',
+    'Logos, graphics, text, and media assets',
+    'Business concepts and execution models',
+  ];
+  const copyrightCredits = [
+    ['Founders', 'Shivankar Raghuwanshi and Aditya Lakhotia'],
+    ['Concept and Creative Direction', 'Shivankar Raghuwanshi'],
+    ['UI/UX Design Idea', 'Shivankar Raghuwanshi'],
+    ['Developer', 'Saatvik Raghuvanshi'],
+    ['Funder / Investor', 'CA Aditya Lakhotia'],
+    ['Financial Manager', 'CA Aditya Lakhotia'],
+    ['Website', 'https://vibebatch.net'],
+  ];
 
   const renderSections = (sections: string[][]) => (
     <div className="space-y-5">
@@ -3350,6 +3376,21 @@ function StaticScreen({ title, user, onBack }: any) {
 
   const content = title === 'about' ? (
     <div className="space-y-6">
+      <section className="rounded-2xl border border-accent/20 bg-background/35 p-5 sm:p-6 space-y-4">
+        <h3 className="text-white font-black text-xl">About Us</h3>
+        <p className="text-sm sm:text-base opacity-85 leading-relaxed">
+          Welcome to <strong className="text-white">VibeBatch</strong>, a platform built on creativity, innovation, and originality.
+        </p>
+        <p className="text-sm sm:text-base opacity-85 leading-relaxed">
+          VibeBatch was founded by <strong className="text-white">Shivankar Raghuwanshi</strong> and <strong className="text-white">Aditya Lakhotia</strong>, whose vision and initiative brought the platform to life. The original concept, creative direction, branding strategy, and UI/UX design idea were created by <strong className="text-white">Shivankar Raghuwanshi</strong>, shaping the identity and overall experience of the platform.
+        </p>
+        <p className="text-sm sm:text-base opacity-85 leading-relaxed">
+          The technical development, implementation, and functionality of the website were developed by <strong className="text-white">Saatvik Raghuvanshi</strong>, who transformed the vision into a fully functional digital experience.
+        </p>
+        <p className="text-sm sm:text-base opacity-85 leading-relaxed">
+          The project was financially supported and backed by <strong className="text-white">CA Aditya Lakhotia</strong>, whose contribution played a crucial role in the growth and execution of the platform. Financial operations, budgeting, and resource management are also managed by <strong className="text-white">CA Aditya Lakhotia</strong>.
+        </p>
+      </section>
       <section className="space-y-3">
         <h3 className="text-white font-bold text-lg">About Your Profile</h3>
         <div className="grid gap-3">
@@ -3362,7 +3403,56 @@ function StaticScreen({ title, user, onBack }: any) {
         </div>
       </section>
     </div>
-  ) : title === 'privacy' ? renderSections(privacySections) : title === 'terms' ? renderSections(termsSections) : (
+  ) : title === 'privacy' ? renderSections(privacySections) : title === 'terms' ? renderSections(termsSections) : title === 'copyright' ? (
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-accent/20 bg-background/35 p-5 sm:p-6 space-y-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.25em] text-accent font-black">Intellectual Property & Copyright Notice</p>
+          <h3 className="mt-2 text-white font-black text-2xl">&copy; 2026 VibeBatch. All Rights Reserved.</h3>
+        </div>
+        <p className="text-sm sm:text-base opacity-85 leading-relaxed">
+          All content, source code, features, functionality, designs, UI/UX elements, graphics, branding, animations, concepts, written material, and digital assets on this website are the exclusive intellectual property of <strong className="text-white">VibeBatch</strong> and its creators unless otherwise stated.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {protectedCopyrightItems.map(item => (
+            <div key={item} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/80">
+              {item}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-accent/20 bg-background/35 p-5 sm:p-6 space-y-4">
+        <h3 className="text-white font-black text-lg">Restricted Use</h3>
+        <p className="text-sm opacity-80 leading-relaxed">No individual, company, organization, or third party is permitted to:</p>
+        <div className="grid gap-3">
+          {restrictedCopyrightUses.map(item => (
+            <div key={item} className="rounded-xl border border-white/10 bg-background/45 px-4 py-3 text-sm font-bold text-white/80">
+              {item}
+            </div>
+          ))}
+        </div>
+        <p className="text-sm opacity-80 leading-relaxed">
+          Unauthorized reproduction, reverse engineering, duplication, redistribution, or misuse of any material associated with this platform may result in legal action under applicable copyright, trademark, intellectual property, and digital protection laws.
+        </p>
+        <p className="text-sm opacity-80 leading-relaxed">
+          For permissions, partnerships, or legal inquiries, contact <a href="mailto:vibebatchsocial@gmail.com" className="font-black text-accent">vibebatchsocial@gmail.com</a>.
+        </p>
+      </section>
+
+      <section className="rounded-2xl border border-accent/20 bg-background/35 p-5 sm:p-6 space-y-4">
+        <h3 className="text-white font-black text-lg">Credits</h3>
+        <div className="grid gap-3">
+          {copyrightCredits.map(([label, value]) => (
+            <div key={label} className="rounded-xl border border-white/10 bg-background/45 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-widest text-white/35 font-black mb-1">{label}</p>
+              <p className="text-sm text-white/85 font-bold">{value}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  ) : (
     <div className="space-y-6">
       <section className="space-y-3">
         <h3 className="text-white font-bold text-lg">Help</h3>
